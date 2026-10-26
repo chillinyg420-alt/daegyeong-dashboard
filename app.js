@@ -146,39 +146,41 @@ function vIns(){
 .ai{background:#f4f8fd;border-radius:10px;padding:10px 12px;line-height:1.65;font-size:14px;margin:6px 0}
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}.sgrid .card{cursor:pointer}`;
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>')})();
-const AV=()=>S.D.adv;
-const latestNote=()=>S.period!==AV().month?`<div class="banner">ℹ️ 이 화면은 최신 마감월 <b>${AV().month}</b> 기준입니다 (선택한 기간과 무관). 매월 마감 후 갱신됩니다.</div>`:'';
+const AM=()=>{const A=S.D.adv;return A.months?(A.months[S.period]?S.period:A.latest):A.month};
+const AV=()=>{const A=S.D.adv;if(!A.months)return A;const k=AM();return Object.assign({month:k,note:A.note},A.months[k])};
+const latestNote=()=>S.period!==AM()?`<div class="banner">ℹ️ 누계를 선택해 최신 마감월 <b>${AM()}</b> 기준으로 보여드립니다. 위 '구분'에서 월을 누르면 그 달 내용으로 바뀝니다.</div>`:'';
 const chipS={'부족':'bad','과다':'warn','적정':'good','무판매':'mid','재고없음':'bad','품절위험':'bad','재고확보':'warn','안정':'good'};
 const chip=(t,c)=>`<span class="chip ${c||chipS[t]||'mid'}">${t}</span>`;
 const ul=a=>`<ul class="blist">${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
 const wkRows=w=>w.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="cyc">${fN(r[2])}</td><td class="pyc">${r[3]?fN(r[3]):'-'}</td><td>${fY(r[4])}</td><td>${r[5]==null?'-':fP(r[5])}</td></tr>`).join('');
 function vBrief(){
- const B=AV().brief,r=B.reg,G=S.group;let h=latestNote();
+ const A=AV(),G=S.group,isR=G==='대경지역',B=isR?A.brief:A.sbrief[G],r=B.m;let h=latestNote();
  const card=(t,v,s)=>`<div class="card"><div class="t">${t}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
- h+=`<div class="panel"><h3>📌 핵심 현황 · ${B.month} · 지역 전체</h3><div class="cards">`+
+ h+=`<div class="panel"><h3>📌 핵심 현황 · ${A.month} · ${isR?'지역 전체':G}</h3><div class="cards">`+
   card('실적합계',fEok(r.tot)+'원',`전년 ${fEok(r.ptot)} · ${fY(r.yoy)}`)+card('목표 달성률',fP(r.ach),'월 목표 대비')+
   card('구매전환율',fP(r.cv),`전년 ${fP(r.pcv)} · ${fPP(r.cv-r.pcv)}`)+card('객단가(합계)',fN(r.atv)+'원',`전년 ${fN(r.patv)} · ${fY(dv(r.atv,r.patv))}`)+
   card('할인율(에누리)',fP(r.disc),`전년 ${fP(r.pdisc)} · ${fPP(r.disc-r.pdisc)}`)+card('인시생산성',fN(r.ip)+'원/h',`전년 ${fN(r.pip)} · ${fY(dv(r.ip,r.pip))}`)+'</div></div>';
- h+=`<div class="panel"><h3>📈 주요 변화</h3><div class="sec">지역 전체</div>${ul(B.changes)}<div class="sec">수치가 튄 매장 <span class="note">(매장을 누르면 매장 TO DO로 이동)</span></div><div class="tw"><table class="t"><thead><tr><th>매장</th><th style="text-align:left">신호</th></tr></thead><tbody>`+
-  B.outliers.map(o=>`<tr class="clk todo-go" data-g="${o[0]}"><td>${o[0]}</td><td style="text-align:left;white-space:normal">${o[1].map(t=>chip(t[1],t[0])).join('')}</td></tr>`).join('')+'</tbody></table></div></div>';
+ h+=isR?`<div class="panel"><h3>📈 주요 변화</h3><div class="sec">지역 전체</div>${ul(B.changes)}<div class="sec">수치가 튄 매장 <span class="note">(매장을 누르면 그 매장 브리핑으로 이동)</span></div><div class="tw"><table class="t"><thead><tr><th>매장</th><th style="text-align:left">신호</th></tr></thead><tbody>`+
+  B.outliers.map(o=>`<tr class="clk" data-g="${o[0]}"><td>${o[0]}</td><td style="text-align:left;white-space:normal">${o[1].map(t=>chip(t[1],t[0])).join('')}</td></tr>`).join('')+'</tbody></table></div></div>'
+  :`<div class="panel"><h3>📈 주요 변화 · ${G}</h3>${B.tags.length?'<div>'+B.tags.map(t=>chip(t[1],t[0])).join('')+'</div>':''}${ul(B.changes)}<div class="note"><span class="clk todo-go" data-g="${G}" style="cursor:pointer;color:var(--navy);font-weight:700">→ 이 매장 TO DO 보기</span> · <span class="clk" data-g="대경지역" style="cursor:pointer;color:var(--navy)">지역 전체 브리핑으로</span></div></div>`;
  h+=`<div class="panel"><h3>🤖 월간 AI 해석</h3>${B.ai.map(p=>`<div class="ai">${p}</div>`).join('')}</div>`;
  h+=`<div class="panel"><h3>💡 자동분석 인사이트</h3>${ul(B.insights)}</div>`;
  h+=`<div class="panel"><h3>🗓️ 월간 리포트 · 주간 매출 흐름 (매장매출, 전년 같은 요일 대비)</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(B.weeks.map(w=>w[0]),[{name:'금년',color:CY,vals:B.weeks.map(w=>w[2])},{name:'전년',color:PY,vals:B.weeks.map(w=>w[3])}])}
- <div class="tw"><table class="t"><thead><tr><th>주차</th><th>기간</th><th>금년</th><th>전년</th><th>전년비</th><th>주간 달성률</th></tr></thead><tbody>${wkRows(B.weeks)}</tbody></table></div><div class="note">※ 주간 달성률 = 매장매출 ÷ (월 목표 × 일수/30 × 매장매출 비중). W40은 3일(9/28~30).</div></div>`;
- const tr=S.D.trend.tot['대경지역'],lab=[1,2,3,4,5,6,7,8,9].map(x=>x+'월');
- h+=`<div class="panel"><h3>월간 매출 흐름 (실적합계)</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}])}</div>`;
- h+=`<div class="panel"><h3>✔ 데이터로 확인된 변화</h3>${ul(B.verified)}<h3 style="margin-top:12px">❓ 점검이 필요한 가설</h3>${ul(B.hyp)}<div class="note">${B.note}</div></div>`;
+ <div class="tw"><table class="t"><thead><tr><th>주차</th><th>기간</th><th>금년</th><th>전년</th><th>전년비</th><th>주간 달성률</th></tr></thead><tbody>${wkRows(B.weeks)}</tbody></table></div><div class="note">※ 주간 달성률 = 매장매출 ÷ (월 목표 × 그 주 일수/그 달 일수 × 매장매출 비중). 월초·월말 주차는 일수가 짧습니다.</div></div>`;
+ const tr=S.D.trend.tot[G]||S.D.trend.tot['대경지역'],lab=[1,2,3,4,5,6,7,8,9].map(x=>x+'월');
+ h+=`<div class="panel"><h3>월간 매출 흐름 (실적합계 · ${isR?'지역 전체':G})</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}])}</div>`;
+ h+=`<div class="panel"><h3>✔ 데이터로 확인된 변화</h3>${ul(B.verified)}<h3 style="margin-top:12px">❓ 점검이 필요한 가설</h3>${ul(B.hyp)}<div class="note">${A.note||""}</div></div>`;
  return h}
 function vTodo(){
  const G=S.group,T=AV().todo;let h=latestNote();
  if(G==='대경지역'){
   h+=`<div class="panel"><h3>✅ 매장을 고르세요 <span class="note">(위 '대상'에서 선택하거나 아래 매장을 누르세요)</span></h3><div class="sgrid">`+
-   S.D.meta.stores.map(s=>{const st=T[s].status;return `<div class="card todo-go" data-g="${s}"><div class="t">${s}</div><div class="v" style="font-size:20px">${fP(st.ach)}</div><div class="s">9월 달성률 · 전년비 ${fY(st.yoy)}</div></div>`}).join('')+'</div></div>';return h}
+   S.D.meta.stores.map(s=>{const st=T[s].status;return `<div class="card todo-go" data-g="${s}"><div class="t">${s}</div><div class="v" style="font-size:20px">${fP(st.ach)}</div><div class="s">${AM()} 달성률 · 전년비 ${fY(st.yoy)}</div></div>`}).join('')+'</div></div>';return h}
  const t=T[G],st=t.status;
  h+=`<div class="panel"><h3>1. 우리 매장 최근 상태 · ${AV().month}</h3><div class="cards">
  <div class="card big"><div class="t">실적합계</div><div class="v">${fEok(st.tot)}원</div><div class="s">전년 대비 ${fY(st.yoy)}</div></div>
  <div class="card"><div class="t">목표 달성률</div><div class="v">${fP(st.ach)}</div><div class="s">차이 ${fD(st.gap)}원</div></div>
- <div class="card"><div class="t">누계 달성률 (1~9월)</div><div class="v">${fP(st.cum)}</div><div class="s">차이 ${fD(st.cgap)}원</div></div></div>
+ <div class="card"><div class="t">누계 달성률 (1~${AM()})</div><div class="v">${fP(st.cum)}</div><div class="s">차이 ${fD(st.cgap)}원</div></div></div>
  <div class="sec">주차별 달성률 흐름</div><div class="ai">${t.weeks.map(w=>`${w[0]} <b>${w[5]==null?'-':fP(w[5])}</b>`).join(' → ')}</div>
  <div class="two"><div><div class="sec">👍 좋아진 점</div>${t.good.length?ul(t.good):'<div class="note">해당 없음</div>'}</div><div><div class="sec">👎 나빠진 점</div>${t.bad.length?ul(t.bad):'<div class="note">해당 없음</div>'}</div></div>
  <div class="sec">주의해서 볼 지표</div><div>${t.watch.map(w=>chip(w[0]+' '+w[1],'mid')).join('')}</div></div>`;
@@ -188,9 +190,9 @@ function vTodo(){
  return h}
 function detailPanel(key){
  const G=S.group,rows=AV().detail[G][key],nm=key==='brand'?'브랜드':'중분류';
- return `<div class="panel"><h3>🔎 ${nm}별 재고 과부족 · ${AV().month} · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>${nm}</th><th>9월 매장매출</th><th>판매수량</th><th>수량 전년비</th><th>재고</th><th>재고 전년비</th><th>재고주수</th><th>상태</th></tr></thead><tbody>`+
+ return `<div class="panel"><h3>🔎 ${nm}별 재고 과부족 · ${AV().month} · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>${nm}</th><th>${AM()} 매장매출</th><th>판매수량</th><th>수량 전년비</th><th>재고</th><th>재고 전년비</th><th>재고주수</th><th>상태</th></tr></thead><tbody>`+
  rows.map(r=>`<tr><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
- `</tbody></table></div><div class="note">※ 재고주수 = 9월 말 재고 ÷ 최근 4주(9/3~9/30) 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과. 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.</div></div>`}
+ `</tbody></table></div><div class="note">※ 재고주수 = ${AM()} 말 재고 ÷ 그 달 마지막 4주 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과.${AM()==='9월'?' 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.':''}</div></div>`}
 function bestPanel(){
  const G=S.group,b=AV().best[G];
  return `<div class="panel"><h3>🏆 베스트 상품 TOP10 · 재고 점검 · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>순위·브랜드</th><th>상품(스타일)</th><th>판매수량</th><th>매장매출</th><th>재고</th><th>재고주수</th><th>점검</th></tr></thead><tbody>`+
@@ -198,8 +200,8 @@ function bestPanel(){
  `</tbody></table></div><div class="note">※ 품절위험 = 재고주수 2주 미만 또는 재고 0 → 즉시 보충 요청 · 재고확보 = 4주 미만.</div></div>`}
 function vInv(){
  const G=S.group,I=AV().inv[G],t=I.total,hl=I.health,ht=Object.values(hl).reduce((a,b)=>a+b,0)||1;let h=latestNote();
- h+=`<div class="cards"><div class="card big"><div class="t">9월 말 재고 수량</div><div class="v">${fN(t[0])}개</div><div class="s">전년 ${fN(t[1])} · ${fY(dv(t[0],t[1]))}</div></div>
- <div class="card"><div class="t">9월 판매수량</div><div class="v">${fN(t[2])}</div><div class="s">전년 ${fN(t[3])} · ${fY(dv(t[2],t[3]))}</div></div>
+ h+=`<div class="cards"><div class="card big"><div class="t">${AM()} 말 재고 수량</div><div class="v">${fN(t[0])}개</div><div class="s">전년 ${fN(t[1])} · ${fY(dv(t[0],t[1]))}</div></div>
+ <div class="card"><div class="t">${AM()} 판매수량</div><div class="v">${fN(t[2])}</div><div class="s">전년 ${fN(t[3])} · ${fY(dv(t[2],t[3]))}</div></div>
  <div class="card"><div class="t">재고주수</div><div class="v">${t[4]==null?'-':t[4]+'주'}</div><div class="s">재고 ÷ 최근 4주 주평균 판매</div></div></div>`;
  const col={'부족':'#d93025','적정':'#2f75b5','과다':'#e3a400','무판매':'#8a93a6'};
  h+=`<div class="panel"><h3>🩺 재고 건강도 (스타일 기준, 수량 비중)</h3><div class="hbar">${Object.entries(hl).map(([k,v])=>v?`<div style="width:${v/ht*100}%;background:${col[k]}">${v/ht>0.06?k+' '+fP(v/ht,0):''}</div>`:'').join('')}</div>
