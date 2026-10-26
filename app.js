@@ -210,14 +210,17 @@ function vInv(){
   AV().check.map(r=>`<tr class="clk" data-g="${r[0]}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${chip(r[3])}</td><td>${fN(r[4])}</td><td>${fY(r[5])}</td><td>${fN(r[6])}</td><td>${fY(r[7])}</td><td>${r[8]==null?'-':r[8]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>'}
  h+=detailPanel('mid');return h}
 
-const VIEWS={brief:vBrief,todo:vTodo,summary:vSummary,bun:()=>vBun()+latestNote()+detailPanel('mid'),brd:()=>vBrd()+latestNote()+bestPanel()+detailPanel('brand'),inv:vInv,tz:vTz,ins:vIns};
+const OLDDATA=()=>`<div class="banner">⚠️ 이 탭의 자료가 아직 올라오지 않았습니다. 저장소 <b>docs</b> 폴더에 <b>최신 data.enc.json</b>(10/26 받은 파일)을 다시 올린 뒤 새로고침해 주세요.</div>`;
+const safe=f=>()=>S.D.adv?f():'';
+const VIEWS={brief:vBrief,todo:vTodo,summary:vSummary,bun:()=>vBun()+safe(()=>latestNote()+detailPanel('mid'))(),brd:()=>vBrd()+safe(()=>latestNote()+bestPanel()+detailPanel('brand'))(),inv:vInv,tz:vTz,ins:vIns};
 function render(){
  $('#basis').innerHTML=BASES.map(b=>`<button class="pill bs ${b===S.basis?'on':''}" data-b="${b}">${b}</button>`).join('');
  $('#periods').innerHTML=S.D.meta.periods.map(p=>`<button class="pill ${p===S.period?'on':''} ${p.startsWith('누계')?'ytd':''}" data-p="${p}">${p.startsWith('누계')?'누계 (1~9월)':p}</button>`).join('');
  $('#group').value=S.group;
  $('#tabs').innerHTML=TABS.map(([k,t])=>`<div class="tab ${k===S.tab?'on':''}" data-t="${k}">${t}</div>`).join('');
  $('#gnote').textContent=S.group==='대경지역'?'22개 점 합산':'';
- $('#main').innerHTML=VIEWS[S.tab]();
+ const needAdv=['brief','todo','inv'].includes(S.tab);
+ try{ $('#main').innerHTML=(needAdv&&!S.D.adv)?OLDDATA():VIEWS[S.tab]() }catch(e){console.error(e);$('#main').innerHTML=`<div class="banner">⚠️ 이 화면을 표시하지 못했습니다(${e.message}). docs 폴더의 data.enc.json이 최신 파일인지 확인해 주세요.</div>`}
  location.hash=`#b=${encodeURIComponent(S.basis)}&p=${encodeURIComponent(S.period)}&g=${encodeURIComponent(S.group)}&t=${S.tab}`;
 }
 function bind(){
@@ -237,7 +240,7 @@ async function decrypt(enc,pass){const te=new TextEncoder();const km=await crypt
  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(enc.salt),iterations:enc.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
  const buf=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(enc.iv)},key,b64(enc.data));return JSON.parse(new TextDecoder().decode(buf))}
 async function unlock(pass){
- const enc=await (await fetch('data.enc.json')).json();
+ const enc=await (await fetch('data.enc.json?v='+Date.now(),{cache:'no-store'})).json();
  S.D=await decrypt(enc,pass);
  const h=new URLSearchParams(location.hash.slice(1));
  S.basis=BASES.includes(h.get('b'))?h.get('b'):'합계';
