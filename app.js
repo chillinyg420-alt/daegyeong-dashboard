@@ -13,7 +13,9 @@ const dv=(a,b)=>b?a/b-1:null;
 const sg=v=>nz(v)==null?'':(v>=0?'pos':'neg');
 const fY=v=>nz(v)==null?'<span style="color:#999">-</span>':`<span class="${sg(v)}">${v>=0?'+':''}${(v*100).toFixed(1)}%</span>`;
 const fD=v=>nz(v)==null?'-':`<span class="${sg(v)}">${v>=0?'+':''}${Math.round(v).toLocaleString('ko-KR')}</span>`;
-const plabel=p=>p.startsWith('누계')?'누계 (1~9월)':p;
+const MONTHS=()=>S.D.meta.periods.filter(p=>!p.startsWith('누계')).map(p=>parseInt(p));
+const LASTM=()=>Math.max(...MONTHS());
+const plabel=p=>p.startsWith('누계')?`누계 (1~${LASTM()}월)`:p;
 const gname=g=>g==='대경지역'?'지역 전체':g;
 function addRows(a,b){return a.map((x,i)=>{const y=b[i];return [(x[0]||0)+(y[0]||0),(x[1]||0)+(y[1]||0),x[2],x[3]]})}
 function pick(node,P,G){const d=node.data;if(S.basis==='매장매출')return d.off[P][G];if(S.basis==='재고통합')return d.int[P][G];return addRows(d.off[P][G],d.int[P][G])}
@@ -65,7 +67,7 @@ function vSummary(){
  h+=card('객단가 · 온라인',fN(m.atvInt)+'원',`전년 ${fN(m.patvInt)} · ${fY(dv(m.atvInt,m.patvInt))}`);
  h+=b==='재고통합'?card('인시생산성','해당 없음','재고통합은 근무인시 연결 불가'):card('인시생산성'+(b==='매장매출'?' (매장매출)':''),fN(m.ip)+'원/h',`전년 ${fN(m.pip)} · ${fY(dv(m.ip,m.pip))}`);
  h+='</div>';
- const tr=D.trend[BK[b]][G],labels=[1,2,3,4,5,6,7,8,9].map(x=>x+'월');
+ const tr=D.trend[BK[b]][G],labels=MONTHS().map(x=>x+'월');
  h+=`<div class="panel"><h3>월별 ${b} 추이 · ${gname(G)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(labels,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}])}<div class="note">※ 전년 값이 비어 있는 달은 전년 미영업(신규·리뉴얼) 기간입니다.</div></div>`;
  if(G==='대경지역'){
   const cols=hap?[['hv','실적합계',fN,'cyc'],['yoy','전년비',fY],['ach','달성율',fP],['prof','이익율',fP],['disc','에누리율',fP],['conv','전환율',fP],['atv','객단가(합계)',fN],['atvOff','객단가(오프)',fN],['atvInt','객단가(온)',fN],['ip','인시생산성',fN]]
@@ -98,7 +100,7 @@ function vBun(){
  if(bs!=='매장매출'&&ms&&(ms[0]||ms[1])&&tot){const xr=(cls,nm,c,p)=>`<tr class="${cls}"><td>${nm}</td><td class="cyc">${fN(c)}</td><td>-</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>-</td><td>-</td><td></td></tr>`;
   b+=xr('l2','※ 분류 불가 재고통합 (판매상세 미포함)',ms[0],ms[1]);b+=xr('tot',bs==='합계'?'실적합계 (월 KPI 기준)':'재고통합 (월 KPI 기준)',T+ms[0],TP+ms[1]);
   note2=` · 판매상세에 재고통합 내역이 있는 9개점만 분류 가능 — 나머지 점의 재고통합은 '분류 불가' 행으로 표시(합계는 월 KPI와 일치)`}
- return `<div class="panel"><h3>분류별 실적 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}<div class="tw"><table class="t"><thead><tr><th>분류</th><th>금년 실적</th><th>구성비</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th><th>금년 비중</th></tr></thead><tbody>${b}</tbody></table></div><div class="note">※ ${bs} 기준(${BNOTE[bs]}) · 중분류 행을 누르면 소분류가 펼쳐집니다.${note2} · 재고는 재고현황 기말 수량(월=해당 월말, 누계=9월말 · 기준과 무관 · 스타일 코드로 판매 분류에 매칭, 미매칭분은 합계에만 포함)</div></div>`}
+ return `<div class="panel"><h3>분류별 실적 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}<div class="tw"><table class="t"><thead><tr><th>분류</th><th>금년 실적</th><th>구성비</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th><th>금년 비중</th></tr></thead><tbody>${b}</tbody></table></div><div class="note">※ ${bs} 기준(${BNOTE[bs]}) · 중분류 행을 누르면 소분류가 펼쳐집니다.${note2} · 재고는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말 · 기준과 무관 · 스타일 코드로 판매 분류에 매칭, 미매칭분은 합계에만 포함)</div></div>`}
 function vBrd(){
  const P=S.period,G=S.group,D=S.D,data=brdRows(P,G),names=D.brd.brands,bs=S.basis;
  const list=names.map((n,i)=>({n,v:data[i]})).filter(x=>x.n!=='합계'&&(x.v[0]||x.v[1])).sort((a,b)=>b.v[0]-a.v[0]);
@@ -108,7 +110,7 @@ function vBrd(){
  let h=`<div class="panel"><h3>브랜드별 신발 실적 TOP10 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(ch.map(x=>x.n),[{name:'금년',color:CY,vals:ch.map(x=>x.v[0])},{name:'전년',color:PY,vals:ch.map(x=>x.v[1])}],{rot:true,h:260})}</div>`;
  h+=`<div class="panel"><h3>브랜드 상세 <span class="note">표시 수: ${[10,15,30,999].map(n=>`<a href="#" class="topn" data-n="${n}" style="${S.topN===n?'font-weight:700':''}">${n===999?'전체':'TOP'+n}</a>`).join(' · ')}</span></h3><div class="tw"><table class="t"><thead><tr><th>순위·브랜드</th><th>금년 실적</th><th>비중</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th></tr></thead><tbody>`+
  top.map((x,i)=>{const[c,p,sc,sp]=x.v;return `<tr><td>${i+1}. ${x.n}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td></tr>`}).join('')+
- `<tr class="tot"><td>합계(표 브랜드)</td><td>${fN(T)}</td><td>100%</td><td>${fN(TP)}</td><td>${fY(dv(T,TP))}</td><td>${TP?fD(T-TP):'-'}</td><td>${tot[2]==null?'-':fN(tot[2])}</td><td>${tot[3]==null?'-':fN(tot[3])}</td></tr></tbody></table></div><div class="note">※ 신발 카테고리 · ${bs} 기준(${BNOTE[bs]})${bs==='매장매출'?'':' · 판매상세에 재고통합 내역이 있는 9개점만 반영(나머지 13개점은 매장매출만 포함)'} · 재고(신발)는 재고현황 기말 수량(월=해당 월말, 누계=9월말).</div></div>`;
+ `<tr class="tot"><td>합계(표 브랜드)</td><td>${fN(T)}</td><td>100%</td><td>${fN(TP)}</td><td>${fY(dv(T,TP))}</td><td>${TP?fD(T-TP):'-'}</td><td>${tot[2]==null?'-':fN(tot[2])}</td><td>${tot[3]==null?'-':fN(tot[3])}</td></tr></tbody></table></div><div class="note">※ 신발 카테고리 · ${bs} 기준(${BNOTE[bs]})${bs==='매장매출'?'':' · 판매상세에 재고통합 내역이 있는 9개점만 반영(나머지 13개점은 매장매출만 포함)'} · 재고(신발)는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말).</div></div>`;
  return h}
 function vTz(){
  const G=S.group,D=S.D,P=S.period,t=D.tz.months[P][G],lab=D.meta.tzBands;
@@ -122,7 +124,7 @@ function vTz(){
 function vIns(){
  const P=S.period,G=S.group,D=S.D,b=S.basis;
  if(b==='재고통합')return `<div class="panel"><h3>인시생산성 · 재고통합 기준</h3><div class="banner">ℹ️ 재고통합(online)은 매장 근무인시와 연결되지 않아 인시생산성이 <b>해당 없음</b>입니다. 위에서 <b>합계</b> 또는 <b>매장매출</b> 기준을 선택해 주세요.</div></div>`;
- const m=MX(P,G),mo=[1,2,3,4,5,6,7,8,9],K=BK[b],BLn=b==='합계'?'실적합계':'매장매출';
+ const m=MX(P,G),mo=MONTHS(),K=BK[b],BLn=b==='합계'?'실적합계':'매장매출';
  const ipm=(k)=>mo.map(x=>{const i=D.ins[x+'월'][G][k];return i.h?i[K]/i.h:null});
  let h='<div class="cards">';
  h+=`<div class="card big"><div class="t">인시생산성 (${BLn} ÷ 근무인시)</div><div class="v">${fN(m.ip)}원/h</div><div class="s">전년 ${fN(m.pip)} · ${fY(dv(m.ip,m.pip))}</div></div>`;
@@ -167,7 +169,7 @@ function vBrief(){
  h+=`<div class="panel"><h3>💡 자동분석 인사이트</h3>${ul(B.insights)}</div>`;
  h+=`<div class="panel"><h3>🗓️ 월간 리포트 · 주간 매출 흐름 (매장매출, 전년 같은 요일 대비)</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(B.weeks.map(w=>w[0]),[{name:'금년',color:CY,vals:B.weeks.map(w=>w[2])},{name:'전년',color:PY,vals:B.weeks.map(w=>w[3])}])}
  <div class="tw"><table class="t"><thead><tr><th>주차</th><th>기간</th><th>금년</th><th>전년</th><th>전년비</th><th>주간 달성률</th></tr></thead><tbody>${wkRows(B.weeks)}</tbody></table></div><div class="note">※ 주간 달성률 = 매장매출 ÷ (월 목표 × 그 주 일수/그 달 일수 × 매장매출 비중). 월초·월말 주차는 일수가 짧습니다.</div></div>`;
- const tr=S.D.trend.tot[G]||S.D.trend.tot['대경지역'],lab=[1,2,3,4,5,6,7,8,9].map(x=>x+'월');
+ const tr=S.D.trend.tot[G]||S.D.trend.tot['대경지역'],lab=MONTHS().map(x=>x+'월');
  h+=`<div class="panel"><h3>월간 매출 흐름 (실적합계 · ${isR?'지역 전체':G})</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}])}</div>`;
  h+=`<div class="panel"><h3>✔ 데이터로 확인된 변화</h3>${ul(B.verified)}<h3 style="margin-top:12px">❓ 점검이 필요한 가설</h3>${ul(B.hyp)}<div class="note">${A.note||""}</div></div>`;
  return h}
@@ -192,7 +194,7 @@ function detailPanel(key){
  const G=S.group,rows=AV().detail[G][key],nm=key==='brand'?'브랜드':'중분류';
  return `<div class="panel"><h3>🔎 ${nm}별 재고 과부족 · ${AV().month} · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>${nm}</th><th>${AM()} 매장매출</th><th>판매수량</th><th>수량 전년비</th><th>재고</th><th>재고 전년비</th><th>재고주수</th><th>상태</th></tr></thead><tbody>`+
  rows.map(r=>`<tr><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
- `</tbody></table></div><div class="note">※ 재고주수 = ${AM()} 말 재고 ÷ 그 달 마지막 4주 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과.${AM()==='9월'?' 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.':''}</div></div>`}
+ `</tbody></table></div><div class="note">※ 재고주수 = ${AM()} 말 재고 ÷ 그 달 마지막 4주 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과.${AM()==='9월'?' 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.':''}${AM()==='10월'?' 10월은 전년 추석(10/5~7)이 있던 달이라 판매·매출 전년비가 낮게 나옵니다(9·10월 합산 비교 권장).':''}</div></div>`}
 function bestPanel(){
  const G=S.group,b=AV().best[G];
  return `<div class="panel"><h3>🏆 베스트 상품 TOP10 · 재고 점검 · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>순위·브랜드</th><th>상품(스타일)</th><th>판매수량</th><th>매장매출</th><th>재고</th><th>재고주수</th><th>점검</th></tr></thead><tbody>`+
@@ -212,12 +214,12 @@ function vInv(){
   AV().check.map(r=>`<tr class="clk" data-g="${r[0]}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${chip(r[3])}</td><td>${fN(r[4])}</td><td>${fY(r[5])}</td><td>${fN(r[6])}</td><td>${fY(r[7])}</td><td>${r[8]==null?'-':r[8]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>'}
  h+=detailPanel('mid');return h}
 
-const OLDDATA=()=>`<div class="banner">⚠️ 이 탭의 자료가 아직 올라오지 않았습니다. 저장소 <b>docs</b> 폴더에 <b>최신 data.enc.json</b>(10/26 받은 파일)을 다시 올린 뒤 새로고침해 주세요.</div>`;
+const OLDDATA=()=>`<div class="banner">⚠️ 이 탭의 자료가 아직 올라오지 않았습니다. 저장소 <b>docs</b> 폴더에 <b>최신 data.enc.json</b>을 다시 올린 뒤 새로고침해 주세요.</div>`;
 const safe=f=>()=>S.D.adv?f():'';
 const VIEWS={brief:vBrief,todo:vTodo,summary:vSummary,bun:()=>vBun()+safe(()=>latestNote()+detailPanel('mid'))(),brd:()=>vBrd()+safe(()=>latestNote()+bestPanel()+detailPanel('brand'))(),inv:vInv,tz:vTz,ins:vIns};
 function render(){
  $('#basis').innerHTML=BASES.map(b=>`<button class="pill bs ${b===S.basis?'on':''}" data-b="${b}">${b}</button>`).join('');
- $('#periods').innerHTML=S.D.meta.periods.map(p=>`<button class="pill ${p===S.period?'on':''} ${p.startsWith('누계')?'ytd':''}" data-p="${p}">${p.startsWith('누계')?'누계 (1~9월)':p}</button>`).join('');
+ $('#periods').innerHTML=S.D.meta.periods.map(p=>`<button class="pill ${p===S.period?'on':''} ${p.startsWith('누계')?'ytd':''}" data-p="${p}">${p.startsWith('누계')?`누계 (1~${LASTM()}월)`:p}</button>`).join('');
  $('#group').value=S.group;
  $('#tabs').innerHTML=TABS.map(([k,t])=>`<div class="tab ${k===S.tab?'on':''}" data-t="${k}">${t}</div>`).join('');
  $('#gnote').textContent=S.group==='대경지역'?'22개 점 합산':'';
