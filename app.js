@@ -261,3 +261,87 @@ function init(){
 }
 if(typeof document!=='undefined'){document.addEventListener('DOMContentLoaded',init);if(document.readyState!=='loading')init()}
 if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
+// ===== 다운로드 (열람 중인 화면 → PDF 보기용 / 엑셀 편집용) =====
+(function(){
+ const css=`.dlbar{display:flex;justify-content:flex-end;gap:6px;margin:0 0 8px;flex-wrap:wrap}.dlbtn{border:1px solid #1f3864;background:#fff;color:#1f3864;border-radius:16px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.dlbtn.main{background:#1f3864;color:#fff}.dlbtn[disabled]{opacity:.55;cursor:wait}.dlmini{border:1px solid #c9d3e6;background:#fff;color:#1f3864;border-radius:10px;padding:1px 7px;font-size:11px;cursor:pointer;margin-left:6px;vertical-align:middle}`;
+ document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+ const libs={};
+ const need=src=>libs[src]||(libs[src]=new Promise((ok,no)=>{const s=document.createElement('script');s.src=src+'?v=1';s.onload=ok;s.onerror=()=>{delete libs[src];no(new Error('다운로드 기능을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'))};document.head.appendChild(s)}));
+ const TN=()=>Object.fromEntries(TABS)[S.tab]||S.tab;
+ const fname=(ext,s)=>`대경_${TN()}_${S.group==='대경지역'?'지역전체':S.group}_${plabel(S.period)}_${S.basis}${s?'_'+s:''}.${ext}`.replace(/[\\/:*?"<>|\s()]+/g,'_');
+ const title=p=>{const h=p.querySelector('h3');if(!h)return '';const c=h.cloneNode(true);c.querySelectorAll('.note,.dlmini').forEach(x=>x.remove());return c.textContent.replace(/[📌📈🤖💡🗓️✔❓✅🔎🏆🩺⚠️]/gu,'').trim()};
+ const sub=()=>`${gname(S.group)} · ${plabel(S.period)} · ${S.basis} 기준(${BNOTE[S.basis]}) · 자료 기준일 ${S.D.meta.asof}`;
+ // ---------- 엑셀 (서식 포함)
+ const NAVY='1F3864',bd={style:'thin',color:{rgb:'D0D7E5'}},BORDER={top:bd,bottom:bd,left:bd,right:bd};
+ const ST={title:{font:{bold:true,sz:13,color:{rgb:NAVY}}},sub:{font:{sz:9,color:{rgb:'6B7385'}}},
+  th:{font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb:NAVY}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:BORDER}};
+ const wlen=s=>[...String(s)].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0);
+ function parse(x){const m=x.match(/^([+-]?[\d,]+(?:\.\d+)?)(%p|%|원\/h|원|주|개|h|일|억원|억)?$/);if(!m)return null;let n=parseFloat(m[1].replace(/,/g,''));if(isNaN(n))return null;const u=m[2]||'';
+  if(u==='억'||u==='억원')return{v:n*1e8,z:'#,##0'};
+  if(u==='%')return{v:n/100,z:/^[+-]/.test(x)?'+0.0%;-0.0%;0.0%':'0.0%'};if(u==='%p')return{v:n,z:'+0.0"%p";-0.0"%p";0.0"%p"'};
+  if(u==='주'||(/\./.test(m[1])&&!u))return{v:n,z:'0.0'};return{v:n,z:'#,##0'}}
+ function cellStyle(td,tr){const s={font:{sz:10,color:{rgb:'222222'}},border:BORDER,alignment:{vertical:'center'}};
+  if(td.classList.contains('cyc')){s.fill={fgColor:{rgb:'D6E4F7'}};s.font.color={rgb:NAVY}}
+  if(td.classList.contains('pyc')){s.fill={fgColor:{rgb:'E4E4E4'}};s.font.color={rgb:'3F3F3F'}}
+  if(tr.classList.contains('tot')){s.fill={fgColor:{rgb:'D9E2F3'}};s.font.bold=true;s.font.color={rgb:NAVY}}
+  if(tr.classList.contains('l0')){s.fill={fgColor:{rgb:'EEF3FA'}};s.font.bold=true}
+  if(tr.classList.contains('me')){s.fill={fgColor:{rgb:'FFF2CC'}};s.font.bold=true}
+  if(td.querySelector('.pos'))s.font.color={rgb:'1A6FC4'};if(td.querySelector('.neg'))s.font.color={rgb:'C5221F'};
+  const ch=td.querySelector('.chip');if(ch){s.font.bold=true;s.alignment.horizontal='center';
+   if(ch.classList.contains('bad'))s.font.color={rgb:'C5221F'},s.fill={fgColor:{rgb:'FDE8E6'}};else if(ch.classList.contains('warn'))s.font.color={rgb:'7F6000'},s.fill={fgColor:{rgb:'FFF2CC'}};else if(ch.classList.contains('good'))s.font.color={rgb:'1A6FC4'},s.fill={fgColor:{rgb:'E3F0FB'}}}
+  return s}
+ function tableSheet(tb,ttl){const aoa=[[ttl],[sub()],[]],styles=[],merges=[];let r0=3;const widths=[];
+  tb.querySelectorAll('tr').forEach((tr,ri)=>{const row=[],sr=[];let c=0;
+   tr.querySelectorAll('th,td').forEach(td=>{const x=td.textContent.replace(/[▸▾▼▲]/g,'').trim(),isH=td.tagName==='TH';
+    const p=isH?null:parse(x);const cell=p?{v:p.v,t:'n',z:p.z}:{v:x,t:'s'};
+    const st=isH?ST.th:cellStyle(td,tr);if(p)st.alignment=Object.assign({},st.alignment,{horizontal:'right'});if(td.classList.contains('l2')||(tr.classList.contains('l2')&&c===0))st.alignment=Object.assign({},st.alignment,{indent:2});
+    cell.s=st;row[c]=cell;widths[c]=Math.max(widths[c]||6,Math.min(46,wlen(p?x:x)+2));
+    const cs=+td.getAttribute('colspan')||1;if(cs>1){merges.push({s:{r:r0+ri,c},e:{r:r0+ri,c:c+cs-1}});for(let k=1;k<cs;k++)row[c+k]={v:'',t:'s',s:st}}c+=cs});
+   aoa.push(row)});
+  const ws=XLSX.utils.aoa_to_sheet(aoa.map(r=>r.map(x=>x&&typeof x==='object'?x.v:x)));
+  aoa.forEach((r,ri)=>r.forEach((x,ci)=>{if(x&&typeof x==='object'){const a=XLSX.utils.encode_cell({r:ri,c:ci});ws[a]={v:x.v,t:x.t,s:x.s};if(x.z)ws[a].z=x.z}}));
+  ws.A1.s=ST.title;ws.A2.s=ST.sub;ws['!merges']=merges;ws['!cols']=widths.map(w=>({wch:w}));ws['!rows']=[{hpt:22},{hpt:15},{hpt:6},{hpt:30}];
+  return ws}
+ function textSheet(rows,ttl){const aoa=[[ttl],[sub()],[]].concat(rows);const ws=XLSX.utils.aoa_to_sheet(aoa);ws.A1.s=ST.title;ws.A2.s=ST.sub;
+  rows.forEach((r,i)=>{const a='A'+(i+4),b='B'+(i+4);if(ws[a])ws[a].s={font:{bold:true,color:{rgb:NAVY}},alignment:{vertical:'top'}};if(ws[b])ws[b].s={alignment:{wrapText:true,vertical:'top'},font:{sz:10}}});
+  ws['!cols']=[{wch:16},{wch:110}];return ws}
+ function cardsSheet(root){const rows=[];root.querySelectorAll('.card').forEach(c=>{const t=c.querySelector('.t'),v=c.querySelector('.v'),s=c.querySelector('.s');if(t)rows.push([t.textContent.trim(),v?v.textContent.trim():'',s?s.textContent.trim():''])});
+  if(!rows.length)return null;const aoa=[['핵심 지표'],[sub()],[],['항목','값','비고']].concat(rows);const ws=XLSX.utils.aoa_to_sheet(aoa);ws.A1.s=ST.title;ws.A2.s=ST.sub;
+  ['A4','B4','C4'].forEach(a=>ws[a].s=ST.th);rows.forEach((r,i)=>{const n=i+5;ws['A'+n].s={font:{bold:true,color:{rgb:NAVY}},border:BORDER,fill:{fgColor:{rgb:'F4F8FD'}}};ws['B'+n].s={font:{bold:true,sz:12},border:BORDER,alignment:{horizontal:'right'}};ws['C'+n].s={font:{color:{rgb:'6B7385'}},border:BORDER}});
+  ws['!cols']=[{wch:36},{wch:18},{wch:44}];return ws}
+ const sname=(t,i,used)=>{let n=((i+1)+'_'+(t||'표')).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31);while(used.has(n))n=n.slice(0,28)+'~'+used.size;used.add(n);return n};
+ function listRows(p){const out=[];p.querySelectorAll('.sec,li,.ai,.todo').forEach(x=>{if(x.closest('table'))return;if(x.classList.contains('todo')){out.push(['할 일',x.innerText.replace(/\n+/g,' · ')]);return}if(x.closest('.todo'))return;out.push([x.classList.contains('sec')?x.innerText.trim():'',x.classList.contains('sec')?'':x.innerText.trim()])});return out}
+ async function xlsAll(only){await need('xlsx-style.min.js');const wb=XLSX.utils.book_new(),used=new Set(),m=$('#main');
+  if(!only){const cs=cardsSheet(m);if(cs)XLSX.utils.book_append_sheet(wb,cs,sname('핵심 지표',used.size,used))}
+  let lt='';(only?[only]:[...m.querySelectorAll('.panel')]).forEach(p=>{const t=title(p)||(lt?lt+' 표':'표');lt=t;const tbs=p.querySelectorAll('table');
+   if(tbs.length)tbs.forEach((tb,k)=>XLSX.utils.book_append_sheet(wb,tableSheet(tb,t),sname(t+(tbs.length>1?' '+(k+1):''),used.size,used)));
+   else{const lr=listRows(p);if(lr.length)XLSX.utils.book_append_sheet(wb,textSheet(lr,t),sname(t,used.size,used))}});
+  XLSX.writeFile(wb,fname('xlsx',only?title(only).slice(0,20):''))}
+ // ---------- PDF (화면 그대로)
+ async function pdfAll(){await need('html2canvas.min.js');await need('jspdf.min.js');const {jsPDF}=window.jspdf;const m=$('#main');
+  const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'landscape'}),PW=297,PH=210,MG=8,W=PW-MG*2;let y=MG;
+  const box=document.createElement('div');box.style.cssText='position:absolute;left:-30000px;top:0;width:1120px;padding:12px;background:#f4f6fa';
+  box.innerHTML=`<style>.pdfx .tw{overflow:visible!important}.pdfx .dlbar,.pdfx .dlmini{display:none!important}.pdfx .two{grid-template-columns:1fr 1fr!important}.pdfx .card.big{grid-column:span 2!important}.pdfx table.t th{position:static!important}</style>`;
+  const head=document.createElement('div');head.style.cssText='background:#1f3864;color:#fff;padding:12px 16px;border-radius:10px;margin-bottom:12px';
+  head.innerHTML=`<div style="font-size:18px;font-weight:800">📊 대경지역 매출자료 · ${TN()}</div><div style="font-size:13px;opacity:.9;margin-top:4px">${sub()}</div>`;
+  const cl=m.cloneNode(true);cl.classList.add('pdfx');cl.removeAttribute('id');cl.style.maxWidth='none';cl.style.padding='0';
+  box.appendChild(head);box.appendChild(cl);box.classList.add('pdfx');document.body.appendChild(box);
+  try{const blocks=[head,...[...cl.children].filter(x=>!x.classList.contains('dlbar')&&x.tagName!=='STYLE')];
+   for(const el of blocks){const cv=await html2canvas(el,{scale:2,backgroundColor:'#ffffff',logging:false,windowWidth:1200});
+    const ratio=W/cv.width;let off=0;
+    while(off<cv.height-1){const room=PH-MG-y,remain=(cv.height-off)*ratio;
+     if(remain>room&&y>MG&&(room<40||remain<=PH-MG*2)){pdf.addPage();y=MG;continue}
+     const take=Math.min(remain,room),hp=Math.round(take/ratio);const c2=document.createElement('canvas');c2.width=cv.width;c2.height=hp;
+     c2.getContext('2d').drawImage(cv,0,off,cv.width,hp,0,0,cv.width,hp);
+     pdf.addImage(c2.toDataURL('image/jpeg',0.9),'JPEG',MG,y,W,hp*ratio);y+=hp*ratio+3;off+=hp;
+     if(off<cv.height-1){pdf.addPage();y=MG}}}
+   pdf.save(fname('pdf'))}finally{box.remove()}}
+ const run=(btn,f,label)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='만드는 중…';f().catch(e=>alert(e.message)).finally(()=>{btn.disabled=false;btn.textContent=t})};
+ const _r=render;render=function(){_r();const m=$('#main');if(!m||!S.D)return;
+  m.insertAdjacentHTML('afterbegin','<div class="dlbar"><button class="dlbtn main" id="dlpdf" title="지금 화면을 색·표·그래프 그대로 PDF로 저장 (보기·보고용)">📄 PDF 받기</button><button class="dlbtn" id="dlxls" title="지금 화면의 표를 서식 있는 엑셀로 저장 (편집·분석용)">📊 엑셀 받기</button></div>');
+  m.querySelectorAll('.panel').forEach(p=>{const h=p.querySelector('h3');if(h&&p.querySelector('table'))h.insertAdjacentHTML('beforeend','<button class="dlmini" title="이 표만 엑셀로 저장">⬇ 엑셀</button>')});
+  $('#dlpdf').onclick=e=>{e.stopPropagation();run(e.currentTarget,pdfAll)};$('#dlxls').onclick=e=>{e.stopPropagation();run(e.currentTarget,()=>xlsAll())};
+  m.querySelectorAll('.dlmini').forEach(b=>b.onclick=e=>{e.stopPropagation();e.preventDefault();run(b,()=>xlsAll(b.closest('.panel')))})};
+ if(typeof window!=='undefined')window.__app.render=render;
+})();
