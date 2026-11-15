@@ -666,15 +666,16 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
  // ---------- 베스트상품
  const ART='https://m.abcmart.a-rt.com/display/search-word/result?searchWord=';
  function bestItems(){const P=S.period,G=S.group,PR=S.D.prod,ST=PR.st,rows=(PR.m&&PR.m[P]&&PR.m[P][G])||[],isY=P.startsWith('누계'),lim=(PR.top10||[]).includes(P);
-  return{isY,lim,list:rows.map((r,i)=>{const s=ST[r[0]]||['-',r[0],'기타','기타','기타',0,0],w=r[4],stock=r[3];return{style:r[0],brand:s[0],name:s[1],big:s[2],mid:s[3],sm:s[4],price:s[5],est:s[6],qty:r[1],sales:r[2],stock,weeks:w,rk:i+1,flag:stock==null?'':stock<=0||(w!=null&&w<2)?'품절위험':(w!=null&&w<4)?'재고확보':'안정'}})}}
+  return{isY,lim,list:rows.map((r,i)=>{const s=ST[r[0]]||['-',r[0],'기타','기타','기타',0,0],w=r[4],stock=r[3];return{style:r[0],brand:s[0],name:s[1],big:s[2],mid:s[3],sm:s[4],price:s[5],est:s[6],qty:r[1],sales:r[2],stock,weeks:w,ark:r[5]||i+1,flag:stock==null?'':stock<=0||(w!=null&&w<2)?'품절위험':(w!=null&&w<4)?'재고확보':'안정'}})}}
  function vBest(){if(!S.D.prod)return OLDDATA();const P=S.period,G=S.group,f=X.bf,R=bestItems(),all=R.list,IMG=S.D.prod.img||{};const IB=S.D.prod.imgBase||'';
   const uniq=(k,src)=>[...new Set(src.map(o=>o[k]))].sort();
   let list=all.filter(o=>(!f.brand||o.brand===f.brand)&&(!f.big||o.big===f.big)&&(!f.mid||o.mid===f.mid)&&(!f.sm||o.sm===f.sm));
+  [...list].sort((a,b)=>b.sales-a.sales).forEach((o,i)=>o.rk=i+1);
   list.sort((a,b)=>f.sort==='qty'?b.qty-a.qty:f.sort==='risk'?(!!b.flag&&b.flag!=='안정')-(!!a.flag&&a.flag!=='안정')||b.sales-a.sales:b.sales-a.sales);
   const sel=(id,cur,opts,lab)=>`<label>${lab} <select class="bsel" data-k="${id}"><option value="">전체</option>${opts.map(o=>`<option value="${esc(o)}" ${o===cur?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
   const fb=all.filter(o=>!f.brand||o.brand===f.brand),fg=fb.filter(o=>!f.big||o.big===f.big),fm=fg.filter(o=>!f.mid||o.mid===f.mid);
   const G0=G==='대경지역';
-  const ST_TO=S.D.prod.stockTo||'';let h=`<div class="banner">🏆 <b>${gname(G)}</b> · ${R.isY?`누계(${S.D.prod.full})`:P} · 매장매출 순위 상위 <b>${all.length}개</b> 상품${R.isY?` · 재고는 ${ST_TO} 말 기준`:''}${!R.isY&&ST_TO&&parseInt(P)>parseInt(ST_TO)?` · <b>${P} 스타일별 재고 자료가 아직 없어</b> 재고는 일부 상품만 표시됩니다`:''}. 위 '대상'에서 매장을, '구분'에서 월을 바꿔 볼 수 있습니다.</div>`;
+  const ST_TO=S.D.prod.stockTo||'';let h=`<div class="banner">🏆 <b>${gname(G)}</b> · ${R.isY?`누계(${S.D.prod.full})`:P} · 매출 상위 상품 + <b>대·중·소분류별 상위 상품</b>(의류·용품 포함) ${all.length}개${R.isY?` · 재고는 ${ST_TO} 말 기준`:''}${!R.isY&&ST_TO&&parseInt(P)>parseInt(ST_TO)?` · <b>${P} 스타일별 재고 자료가 아직 없어</b> 재고는 일부 상품만 표시됩니다`:''}. 위 '대상'에서 매장을, '구분'에서 월을 바꿔 볼 수 있습니다.</div>`;
   h+=`<div class="panel"><div class="fl">${sel('brand',f.brand,uniq('brand',all),'브랜드')}${sel('big',f.big,uniq('big',fb),'대분류')}${sel('mid',f.mid,uniq('mid',fg),'중분류')}${sel('sm',f.sm,uniq('sm',fm),'소분류')}
    <label>정렬 <select class="bsel" data-k="sort"><option value="sales" ${f.sort==='sales'?'selected':''}>매출 순</option><option value="qty" ${f.sort==='qty'?'selected':''}>수량 순</option><option value="risk" ${f.sort==='risk'?'selected':''}>재고 주의 먼저</option></select></label>
    <label>보기 <select class="bsel" data-k="view"><option value="card" ${f.view==='card'?'selected':''}>사진 카드</option><option value="table" ${f.view==='table'?'selected':''}>표</option></select></label>
@@ -682,11 +683,14 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
    <div class="note">상품 ${list.length}개 · 판매수량 ${fN(list.reduce((s,o)=>s+o.qty,0))}개 · 매장매출 ${fEok(list.reduce((s,o)=>s+o.sales,0))}원 · 재고 주의 ${list.filter(o=>o.flag&&o.flag!=='안정').length}개</div></div>`;
   if(!list.length)return h+'<div class="panel"><div class="note">조건에 맞는 상품이 없습니다. 필터를 줄여 보세요.</div></div>';
   // 브랜드 요약
+  if(!f.brand&&!f.big){const cs={};all.forEach(o=>{const k=o.big;const c=cs[k]||(cs[k]={n:0,s:0,mids:{}});c.n++;c.s+=o.sales;const m=c.mids[o.mid]||(c.mids[o.mid]={n:0,s:0});m.n++;m.s+=o.sales});
+   h+=`<div class="panel"><h3>분류별 베스트 구성 <span class="note">(행을 누르면 그 분류만 봅니다)</span></h3><div class="tw"><table class="t"><thead><tr><th>대분류</th><th>중분류</th><th>상품 수</th><th>매장매출(표시 상품 합)</th></tr></thead><tbody>`+
+   Object.entries(cs).sort((a,b)=>b[1].s-a[1].s).map(([k,c])=>`<tr class="l0 clk cgo" data-big="${esc(k)}"><td>${k}</td><td></td><td>${c.n}</td><td>${fN(c.s)}</td></tr>`+Object.entries(c.mids).sort((a,b)=>b[1].s-a[1].s).map(([m,v])=>`<tr class="clk cgo" data-big="${esc(k)}" data-mid="${esc(m)}"><td></td><td style="text-align:left">${m}</td><td>${v.n}</td><td>${fN(v.s)}</td></tr>`).join('')).join('')+`</tbody></table></div></div>`}
   const bsum={};list.forEach(o=>{const b=bsum[o.brand]||(bsum[o.brand]={n:0,q:0,s:0,r:0});b.n++;b.q+=o.qty;b.s+=o.sales;if(o.flag&&o.flag!=='안정')b.r++});const bl=Object.entries(bsum).sort((a,b)=>b[1].s-a[1].s);
   if(!f.brand&&bl.length>1){const top=bl.slice(0,10);h+=`<div class="panel"><h3>브랜드별 베스트 구성</h3>${barChart(top.map(x=>x[0]),[{name:'매장매출',color:CY,vals:top.map(x=>x[1].s)}],{rot:true,h:220})}<div class="tw"><table class="t"><thead><tr><th>브랜드</th><th>상품 수</th><th>판매수량</th><th>매장매출</th><th>비중</th><th>재고 주의</th></tr></thead><tbody>${bl.map(([b,v])=>`<tr class="clk bgo" data-b="${esc(b)}"><td>${b}</td><td>${v.n}</td><td>${fN(v.q)}</td><td class="cyc">${fN(v.s)}</td><td>${fP(v.s/list.reduce((s,o)=>s+o.sales,0))}</td><td>${v.r?chipx(v.r+'개','warn'):'-'}</td></tr>`).join('')}</tbody></table></div><div class="note">브랜드 행을 누르면 그 브랜드만 봅니다.</div></div>`}
   const lk=o=>{const q=encodeURIComponent(o.style),q2=encodeURIComponent(o.brand+' '+o.style);return `<div class="plk"><a class="m" href="${ART}${q}" target="_blank" rel="noopener">아트닷컴</a><a href="https://www.google.com/search?tbm=isch&q=${q2}" target="_blank" rel="noopener">구글 이미지</a><a href="https://search.naver.com/search.naver?where=image&query=${q2}" target="_blank" rel="noopener">네이버 이미지</a></div>`};
   const fc=o=>!o.flag?'':chipx(o.flag,o.flag==='품절위험'?'bad':o.flag==='재고확보'?'warn':'good');
-  const card=(o,i)=>`<div class="pc"><div class="pimg"><span class="rk">${o.rk}위</span><div class="ph"><b>${esc(o.brand)}</b>${esc(o.style)}<br>${IMG[o.style]?'사진 불러오는 중':'아래 버튼으로 사진 보기'}</div>${IMG[o.style]?`<a href="${ART}${encodeURIComponent(o.style)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${IB}${IMG[o.style]}?shrink=388:388" alt="${esc(o.name)}" onerror="this.parentNode.remove()"></a>`:''}</div>
+  const card=(o,i)=>`<div class="pc"><div class="pimg"><span class="rk">${o.rk}위</span>${(f.brand||f.big||f.mid||f.sm)&&o.ark!==o.rk?`<span class="rk" style="left:auto;right:6px;background:#8a93a6">전체 ${o.ark}위</span>`:''}<div class="ph"><b>${esc(o.brand)}</b>${esc(o.style)}<br>${IMG[o.style]?'사진 불러오는 중':'아래 버튼으로 사진 보기'}</div>${IMG[o.style]?`<a href="${ART}${encodeURIComponent(o.style)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${IB}${IMG[o.style]}?shrink=388:388" alt="${esc(o.name)}" onerror="this.parentNode.remove()"></a>`:''}</div>
    <div class="pb"><div class="nm">${esc(o.name)}</div><div class="sty">${o.brand} · ${o.style}${o.price?' · 정상가 '+fN(o.price)+'원':''}</div><div>${chipx(o.sm,'mid')}${fc(o)}</div>
    <div class="kv"><span>판매</span><b>${fN(o.qty)}개 · ${fEok(o.sales)}원</b></div><div class="kv"><span>재고</span><b>${o.stock==null?'자료 없음':fN(o.stock)+'개'+(o.weeks!=null?' · '+o.weeks+'주':'')}</b></div>
    ${lk(o)}</div></div>`;
@@ -713,6 +717,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
     else if(t.classList.contains('adel')){X.ai=X.ai.filter(x=>x!==o);render()}return}
    const ag=t.closest('.agoto');if(ag){const el=document.getElementById('clu-'+ag.dataset.c);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});e.stopPropagation();return}
    const sg=t.closest('.sgo');if(sg){S.group=sg.dataset.g;render();window.scrollTo(0,0);return}
+   const cg=t.closest('.cgo');if(cg){X.bf.brand='';X.bf.big=cg.dataset.big;X.bf.mid=cg.dataset.mid||'';X.bf.sm='';render();return}
    const bg=t.closest('.bgo');if(bg){X.bf.brand=bg.dataset.b;X.bf.big=X.bf.mid=X.bf.sm='';render();return}
    if(t.id==='breset'){X.bf={brand:'',big:'',mid:'',sm:'',sort:'sales',view:X.bf.view};render();return}},true);
   m.addEventListener('keydown',e=>{if(e.target.id==='aiq'&&e.key==='Enter'){e.preventDefault();ask(e.target.value)}});
