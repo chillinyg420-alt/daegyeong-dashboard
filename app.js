@@ -20,6 +20,9 @@ const gname=g=>g==='대경지역'?'지역 전체':g;
 function addRows(a,b){return a.map((x,i)=>{const y=b[i];return [(x[0]||0)+(y[0]||0),(x[1]||0)+(y[1]||0),x[2],x[3]]})}
 function pick(node,P,G){const d=node.data;if(S.basis==='매장매출')return d.off[P][G];if(S.basis==='재고통합')return d.int[P][G];return addRows(d.off[P][G],d.int[P][G])}
 const bunRows=(P,G)=>pick(S.D.bun,P,G),brdRows=(P,G)=>pick(S.D.brd,P,G);
+// 영향이 작은 항목 흐리게: 매출(또는 판매수량) 비중과 재고 비중이 모두 2% 미만
+const FADE=0.02;const small=(a,A,b,B)=>{const x=A?(a||0)/A:0,y=B?(b||0)/B:0;return x<FADE&&y<FADE};
+const fz=(a,A,b,B)=>small(a,A,b,B)?' fade':'';
 function metrics(k,i){const b=S.basis,K=BK[b];
  const hv=b==='합계'?k.cy_tot:b==='매장매출'?k.cy_off:k.cy_int,hp=b==='합계'?k.py_tot:b==='매장매출'?k.py_off:k.py_int;
  const iv=K==='int'?null:i.cy[K],ipv=K==='int'?null:i.py[K];
@@ -91,8 +94,8 @@ function vBun(){
   if(sub){subs.push({name:sub,v});return}
   if(mid){mids.push({name:mid,v,subs});subs=[];return}
   tree.push({name:dae,v,mids});mids=[];subs=[]});
- const T=tot?tot.v[0]:1,TP=tot?tot.v[1]:1;
- const row=(cls,nm,v,key,open)=>{const[c,p,sc,sp]=v;const bw=T?Math.max(0,c/T*100):0;return `<tr class="${cls}" ${key?`data-k="${key}"`:''}><td>${key?(open?'▾ ':'▸ '):''}${nm}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td><td style="text-align:left"><span class="bar" style="width:${Math.min(100,bw*2)}px;background:${CY}"></span></td></tr>`};
+ const T=tot?tot.v[0]:1,TP=tot?tot.v[1]:1,TS=tot?tot.v[2]:0;
+ const row=(cls,nm,v,key,open)=>{const[c,p,sc,sp]=v;const bw=T?Math.max(0,c/T*100):0;return `<tr class="${cls}${cls==='tot'?'':fz(c,T,sc,TS)}" ${key?`data-k="${key}"`:''}><td>${key?(open?'▾ ':'▸ '):''}${nm}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td><td style="text-align:left"><span class="bar" style="width:${Math.min(100,bw*2)}px;background:${CY}"></span></td></tr>`};
  let b='';
  tree.forEach(d=>{b+=row('l0',d.name,d.v);d.mids.forEach(m=>{if(!(m.v[0]||m.v[1]))return;const key=d.name+'|'+m.name,op=!!S.open[key];b+=row('l1',m.name,m.v,m.subs.length?key:'',op);if(op)m.subs.forEach(s=>{if(s.v[0]||s.v[1])b+=row('l2',s.name,s.v)})})});
  if(tot)b+=row('tot',bs==='합계'?'합계 (분류 가능분)':'합계',tot.v);
@@ -109,7 +112,7 @@ function vBrd(){
  const ch=list.slice(0,10);
  let h=`<div class="panel"><h3>브랜드별 신발 실적 TOP10 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(ch.map(x=>x.n),[{name:'금년',color:CY,vals:ch.map(x=>x.v[0])},{name:'전년',color:PY,vals:ch.map(x=>x.v[1])}],{rot:true,h:260})}</div>`;
  h+=`<div class="panel"><h3>브랜드 상세 <span class="note">표시 수: ${[10,15,30,999].map(n=>`<a href="#" class="topn" data-n="${n}" style="${S.topN===n?'font-weight:700':''}">${n===999?'전체':'TOP'+n}</a>`).join(' · ')}</span></h3><div class="tw"><table class="t"><thead><tr><th>순위·브랜드</th><th>금년 실적</th><th>비중</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th></tr></thead><tbody>`+
- top.map((x,i)=>{const[c,p,sc,sp]=x.v;return `<tr><td>${i+1}. ${x.n}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td></tr>`}).join('')+
+ top.map((x,i)=>{const[c,p,sc,sp]=x.v;return `<tr class="${fz(c,T,sc,tot[2])}"><td>${i+1}. ${x.n}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td></tr>`}).join('')+
  `<tr class="tot"><td>합계(표 브랜드)</td><td>${fN(T)}</td><td>100%</td><td>${fN(TP)}</td><td>${fY(dv(T,TP))}</td><td>${TP?fD(T-TP):'-'}</td><td>${tot[2]==null?'-':fN(tot[2])}</td><td>${tot[3]==null?'-':fN(tot[3])}</td></tr></tbody></table></div><div class="note">※ 신발 카테고리 · ${bs} 기준(${BNOTE[bs]})${bs==='매장매출'?'':' · 판매상세에 재고통합 내역이 있는 9개점만 반영(나머지 13개점은 매장매출만 포함)'} · 재고(신발)는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말).</div></div>`;
  return h}
 function vTz(){
@@ -192,8 +195,9 @@ function vTodo(){
  return h}
 function detailPanel(key){
  const G=S.group,rows=AV().detail[G][key],nm=key==='brand'?'브랜드':'중분류';
+ const sS=rows.reduce((a,r)=>a+(r[1]||0),0),sK=(AV().inv[G]||{total:[0]}).total[0]||rows.reduce((a,r)=>a+(r[4]||0),0);
  return `<div class="panel"><h3>🔎 ${nm}별 재고 과부족 · ${AV().month} · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>${nm}</th><th>${AM()} 매장매출</th><th>판매수량</th><th>수량 전년비</th><th>재고</th><th>재고 전년비</th><th>재고주수</th><th>상태</th></tr></thead><tbody>`+
- rows.map(r=>`<tr><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
+ rows.map(r=>`<tr class="${fz(r[1],sS,r[4],sK)}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
  `</tbody></table></div><div class="note">※ 재고주수 = ${AM()} 말 재고 ÷ 그 달 마지막 4주 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과.${AM()==='9월'?' 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.':''}${AM()==='10월'?' 10월은 전년 추석(10/5~7)이 있던 달이라 판매·매출 전년비가 낮게 나옵니다(9·10월 합산 비교 권장).':''}</div></div>`}
 function bestPanel(){
  const G=S.group,b=AV().best[G];
@@ -209,9 +213,9 @@ function vInv(){
  h+=`<div class="panel"><h3>🩺 재고 건강도 (스타일 기준, 수량 비중)</h3><div class="hbar">${Object.entries(hl).map(([k,v])=>v?`<div style="width:${v/ht*100}%;background:${col[k]}">${v/ht>0.06?k+' '+fP(v/ht,0):''}</div>`:'').join('')}</div>
  <div>${Object.entries(hl).map(([k,v])=>chip(`${k} ${fN(v)}개 (${fP(v/ht,0)})`,chipS[k])).join('')}</div><div class="note">부족 = 재고주수 4주 미만 · 적정 = 4~52주 · 과다 = 52주 초과 · 무판매 = 최근 8주 판매 0</div></div>`;
  h+=`<div class="panel"><h3>대분류별 재고 전년 대비</h3><div class="tw"><table class="t"><thead><tr><th>대분류</th><th>재고(금년)</th><th>재고(전년)</th><th>재고 전년비</th><th>판매수량</th><th>판매 전년비</th><th>재고주수</th></tr></thead><tbody>`+
-  I.big.map(r=>`<tr><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td class="pyc">${fN(r[2])}</td><td>${fY(dv(r[1],r[2]))}</td><td>${fN(r[3])}</td><td>${fY(dv(r[3],r[4]))}</td><td>${r[5]==null?'-':r[5]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>';
+  I.big.map(r=>`<tr class="${fz(r[3],t[2],r[1],t[0])}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td class="pyc">${fN(r[2])}</td><td>${fY(dv(r[1],r[2]))}</td><td>${fN(r[3])}</td><td>${fY(dv(r[3],r[4]))}</td><td>${r[5]==null?'-':r[5]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>';
  if(G==='대경지역'){h+=`<div class="panel"><h3>⚠️ 재고 과부족 점검 매장 (브랜드·분류) <span class="note">매장을 누르면 이동</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>구분</th><th>이름</th><th>상태</th><th>재고</th><th>재고 전년비</th><th>판매수량</th><th>판매 전년비</th><th>재고주수</th></tr></thead><tbody>`+
-  AV().check.map(r=>`<tr class="clk" data-g="${r[0]}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${chip(r[3])}</td><td>${fN(r[4])}</td><td>${fY(r[5])}</td><td>${fN(r[6])}</td><td>${fY(r[7])}</td><td>${r[8]==null?'-':r[8]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>'}
+  AV().check.map(r=>{const T0=(AV().inv[r[0]]||{total:[0,0,0]}).total;return [r,small(r[6],T0[2],r[4],T0[0])]}).sort((a,b)=>a[1]-b[1]).map(([r,sm])=>`<tr class="clk${sm?' fade':''}" data-g="${r[0]}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${chip(r[3])}</td><td>${fN(r[4])}</td><td>${fY(r[5])}</td><td>${fN(r[6])}</td><td>${fY(r[7])}</td><td>${r[8]==null?'-':r[8]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>'}
  h+=detailPanel('mid');return h}
 
 const OLDDATA=()=>`<div class="banner">⚠️ 이 탭의 자료가 아직 올라오지 않았습니다. 저장소 <b>docs</b> 폴더에 <b>최신 data.enc.json</b>을 다시 올린 뒤 새로고침해 주세요.</div>`;
@@ -795,6 +799,7 @@ function syncHome(){
  .spin{width:26px;height:26px;border:3px solid #dbe4f3;border-top-color:var(--navy);border-radius:50%;animation:sp 0.9s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f3864;color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.2)}
  #totop{position:fixed;right:14px;bottom:18px;width:42px;height:42px;border-radius:50%;border:0;background:var(--navy);color:#fff;font-size:18px;box-shadow:0 3px 10px rgba(0,0,0,.25);display:none;z-index:40;cursor:pointer}
+ table.t tr.fade td{opacity:.42}table.t tr.fade td:first-child::after{content:' · 영향 작음';font-size:10px;color:#6b7385}
  .gate-rem{display:flex;gap:6px;align-items:center;justify-content:center;font-size:12px;color:var(--mut);margin:-2px 0 10px}
  @media(max-width:700px){
   header{padding:10px 12px}header h1{font-size:16px}
