@@ -60,17 +60,18 @@ svg text{font-family:inherit}
 </style>
 </head>
 <body>
-<div id="gate"><h2>🔒 대경지역 매출자료</h2><p>접속 암호를 입력하세요.<br>(자료는 암호로 잠겨 있어 암호 없이는 볼 수 없습니다)</p><input id="pw" type="password" placeholder="암호" autocomplete="current-password"><button id="go">열기</button><div id="err"></div></div>
+<div id="gate"><h2>🔒 대경지역 매출자료</h2><p>접속 암호를 입력하세요.<br>(자료는 암호로 잠겨 있어 암호 없이는 볼 수 없습니다)</p><input id="pw" type="password" placeholder="암호" autocomplete="current-password"><label class="gate-rem"><input type="checkbox" id="remember" style="width:auto;margin:0"> 이 기기에서 암호 기억 (본인 휴대폰·PC에서만)</label><button id="go">열기</button><div id="err"></div></div>
 <div id="app" style="display:none">
-<header><h1>📊 대경지역 매출자료 대시보드</h1><span class="sub" id="asof"></span></header>
+<header><h1>📊 대경지역 매출자료</h1><span class="sub" id="asof"></span><span class="hbar"><button class="hbtn" id="chgHome" title="첫 화면으로 열릴 내 매장 바꾸기">🏠 내 매장 설정</button><button class="hbtn" id="lockBtn" title="이 기기에 저장된 암호를 지우고 잠급니다">🔒 잠그기</button></span><details class="hn"><summary>ⓘ 기준 안내</summary><div id="hnote"></div></details></header>
 <div class="ctrl">
  <div class="row"><span class="lbl">기준</span><div class="pills" id="basis"></div><span class="note" style="margin:0">합계 = 매장매출 + 재고통합</span></div>
  <div class="row"><span class="lbl">구분</span><div class="pills" id="periods"></div></div>
- <div class="row"><span class="lbl">대상</span><select id="group"></select><span class="note" id="gnote" style="margin:0"></span></div>
+ <div class="row"><span class="lbl">대상</span><select id="group"></select><button class="myb" id="homeBtn" style="display:none"></button><button class="myb" id="setHome">⭐ 내 매장 정하기</button><span class="note" id="gnote" style="margin:0"></span></div>
  <div class="tabs" id="tabs"></div>
 </div>
 <main id="main"></main>
 </div>
-<script src="app.js?v=20261115g"></script>
+<button id="totop" title="맨 위로">▲</button>
+<script src="app.js?v=20261116a"></script>
 </body>
 </html>

@@ -223,8 +223,9 @@ function render(){
  $('#group').value=S.group;
  $('#tabs').innerHTML=TABS.map(([k,t])=>`<div class="tab ${k===S.tab?'on':''}" data-t="${k}">${t}</div>`).join('');
  $('#gnote').textContent=S.group==='대경지역'?'22개 점 합산':'';
- const needAdv=['brief','todo','inv'].includes(S.tab);
- try{ $('#main').innerHTML=(needAdv&&!S.D.adv)?OLDDATA():VIEWS[S.tab]() }catch(e){console.error(e);$('#main').innerHTML=`<div class="banner">⚠️ 이 화면을 표시하지 못했습니다(${e.message}). docs 폴더의 data.enc.json이 최신 파일인지 확인해 주세요.</div>`}
+ const miss=(NEED[S.tab]||[]).filter(k=>!S.D[k]);S.waiting=miss.length>0;
+ try{ $('#main').innerHTML=miss.length?LOADING(miss):VIEWS[S.tab]() }catch(e){console.error(e);$('#main').innerHTML=S.pending?LOADING([]):`<div class="banner">⚠️ 이 화면을 표시하지 못했습니다(${e.message}). 새로고침해 주세요. 계속되면 관리자에게 알려 주세요.</div>`}
+ if(typeof syncHome==='function')syncHome();
  location.hash=`#b=${encodeURIComponent(S.basis)}&p=${encodeURIComponent(S.period)}&g=${encodeURIComponent(S.group)}&t=${S.tab}`;
 }
 function bind(){
@@ -243,20 +244,46 @@ function b64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
 async function decrypt(enc,pass){const te=new TextEncoder();const km=await crypto.subtle.importKey('raw',te.encode(pass),'PBKDF2',false,['deriveKey']);
  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(enc.salt),iterations:enc.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
  const buf=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(enc.iv)},key,b64(enc.data));return JSON.parse(new TextDecoder().decode(buf))}
+// ── 자료 조각 불러오기: 핵심(약 70KB)을 먼저 열고, 나머지는 뒤에서 이어 받기
+const NEED={brief:['adv'],todo:['adv'],summary:[],bun:['bun','adv'],brd:['brd','adv','prod'],inv:['adv','bun','brd'],tz:[],ins:['adv'],ai:['adv','bun','brd','prod'],area:[],best:['prod']};
+const PNAME={adv:'브리핑·TO DO·재고',bun:'분류별',brd:'브랜드별',prod:'베스트상품'};
+const LOADING=m=>`<div class="loadbox"><div class="spin"></div><div>자료를 불러오는 중입니다…<br><small>${m.map(k=>PNAME[k]||k).join(' · ')}</small></div></div>`;
+function loadLib(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+async function gunzip(u8){
+ if(typeof DecompressionStream!=='undefined'){const st=new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));return new Uint8Array(await new Response(st).arrayBuffer())}
+ if(!window.fflate)await loadLib('fflate.min.js');return window.fflate.gunzipSync(u8)}
+async function loadPart(name){const r=await fetch(S.man.parts[name].f);if(!r.ok)throw new Error('자료 파일을 받지 못했습니다');
+ const b=new Uint8Array(await r.arrayBuffer());const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},S.key,b.slice(12));
+ return JSON.parse(new TextDecoder().decode(await gunzip(new Uint8Array(pt))))}
 async function unlock(pass){
- const enc=await (await fetch('data.enc.json?v='+Date.now(),{cache:'no-store'})).json();
- S.D=await decrypt(enc,pass);
+ const mr=await fetch('manifest.json?v='+Date.now(),{cache:'no-store'});
+ if(mr.ok){
+  S.man=await mr.json();const te=new TextEncoder();
+  const km=await crypto.subtle.importKey('raw',te.encode(pass),'PBKDF2',false,['deriveKey']);
+  S.key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(S.man.salt),iterations:S.man.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+  S.D=await loadPart('core');
+  const rest=Object.keys(S.man.parts).filter(k=>k!=='core');S.pending=rest.length;
+  S.ready=Promise.all(rest.map(k=>loadPart(k).then(v=>{S.D[k]=v}).catch(e=>{console.error(k,e)}).finally(()=>{S.pending--;if(S.waiting&&!(NEED[S.tab]||[]).some(x=>!S.D[x]))render();else if(S.waiting&&!S.pending)render()})));
+ }else{
+  const enc=await (await fetch('data.enc.json?v='+Date.now(),{cache:'no-store'})).json();
+  S.D=await decrypt(enc,pass);S.ready=Promise.resolve();S.pending=0;
+ }
  const h=new URLSearchParams(location.hash.slice(1));
  S.basis=BASES.includes(h.get('b'))?h.get('b'):'합계';
  S.period=S.D.meta.periods.includes(h.get('p'))?h.get('p'):S.D.meta.periods[0];
- S.group=S.D.meta.groups.includes(h.get('g'))?h.get('g'):'대경지역';
+ const my=lsGet('dg_store');S.group=S.D.meta.groups.includes(h.get('g'))?h.get('g'):(S.D.meta.groups.includes(my)?my:'대경지역');
  S.tab=TABS.some(t=>t[0]===h.get('t'))?h.get('t'):'brief';
- $('#asof').textContent='기준일 '+S.D.meta.asof+' · '+S.D.meta.note;
+ $('#asof').textContent='자료 기준일 '+S.D.meta.asof;if($('#hnote'))$('#hnote').textContent=S.D.meta.note;
  $('#group').innerHTML=S.D.meta.groups.map(g=>`<option value="${g}">${gname(g)}</option>`).join('');
  $('#gate').style.display='none';$('#app').style.display='block';bind();render();
+ if(!h.get('g')&&!lsGet('dg_store'))openPicker(true);
 }
 function init(){
- const go=async()=>{$('#err').textContent='';try{await unlock($('#pw').value)}catch(e){$('#err').textContent='암호가 올바르지 않거나 자료를 읽지 못했습니다.'}};
+ const go=async()=>{$('#err').textContent='';$('#go').disabled=true;$('#go').textContent='여는 중…';const pw=$('#pw').value;
+  try{await unlock(pw);if($('#remember')&&$('#remember').checked)lsSet('dg_pw',pw)}catch(e){console.error(e);$('#err').textContent='암호가 올바르지 않거나 자료를 읽지 못했습니다.'}
+  finally{$('#go').disabled=false;$('#go').textContent='열기'}};
+ const saved=lsGet('dg_pw');if(saved){$('#pw').value=saved;if($('#remember'))$('#remember').checked=true;
+  unlock(saved).catch(()=>{lsDel('dg_pw');$('#pw').value='';$('#err').textContent='저장된 암호가 바뀌었습니다. 새 암호를 입력해 주세요.'})}
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go()};
 }
 if(typeof document!=='undefined'){document.addEventListener('DOMContentLoaded',init);if(document.readyState!=='loading')init()}
@@ -337,7 +364,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
      pdf.addImage(c2.toDataURL('image/jpeg',0.9),'JPEG',MG,y,W,hp*ratio);y+=hp*ratio+3;off+=hp;
      if(off<cv.height-1){pdf.addPage();y=MG}}}
    pdf.save(fname('pdf'))}finally{box.remove()}}
- const run=(btn,f,label)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='만드는 중…';f().catch(e=>alert(e.message)).finally(()=>{btn.disabled=false;btn.textContent=t})};
+ const run=(btn,f,label)=>{const t=btn.textContent;btn.disabled=true;btn.textContent='만드는 중…';Promise.resolve(S.ready).then(()=>f()).catch(e=>alert(e.message)).finally(()=>{btn.disabled=false;btn.textContent=t})};
  const _r=render;render=function(){_r();const m=$('#main');if(!m||!S.D)return;
   m.insertAdjacentHTML('afterbegin','<div class="dlbar"><button class="dlbtn main" id="dlpdf" title="지금 화면을 색·표·그래프 그대로 PDF로 저장 (보기·보고용)">📄 PDF 받기</button><button class="dlbtn" id="dlxls" title="지금 화면의 표를 서식 있는 엑셀로 저장 (편집·분석용)">📊 엑셀 받기</button></div>');
   m.querySelectorAll('.panel').forEach(p=>{const h=p.querySelector('h3');if(h&&p.querySelector('table'))h.insertAdjacentHTML('beforeend','<button class="dlmini" title="이 표만 엑셀로 저장">⬇ 엑셀</button>')});
@@ -725,3 +752,66 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
  const _r2=render;render=function(){_r2();hook()};
  if(typeof window!=='undefined'){window.__app.render=render;window.__app.ask=ask;window.__app.X=X;window.__app.answer=answer}
 })();
+
+// ===== 편의 기능: 내 매장 홈 · 암호 기억 · 모바일 화면 정리 (2026-11) =====
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+function openPicker(first){
+ const G=S.D.meta.groups,stores=G.filter(g=>g!=='대경지역'),my=lsGet('dg_store');
+ const bySign={};stores.forEach(g=>{const k=g.split(' ')[0];(bySign[k]=bySign[k]||[]).push(g)});
+ const btn=g=>`<button class="pk ${g===my?'on':''}" data-g="${g}">${g.replace(/^\S+\s/,'')}</button>`;
+ const box=document.createElement('div');box.id='picker';
+ box.innerHTML=`<div class="pkbox"><h3>${first?'어느 매장을 주로 보시나요?':'내 매장 바꾸기'}</h3>
+ <p>고른 매장이 <b>다음부터 첫 화면</b>으로 바로 열립니다. (이 휴대폰·PC에만 저장)<br>다른 매장은 위쪽 <b>대상</b>에서 언제든 볼 수 있습니다.</p>
+ <button class="pk all ${my==='대경지역'?'on':''}" data-g="대경지역">🗺 지역 전체 <small>(지역장·관리자용)</small></button>
+ ${Object.entries(bySign).map(([k,a])=>`<div class="pkg"><div class="pkt">${k}</div><div class="pkl">${a.map(btn).join('')}</div></div>`).join('')}
+ <div class="pkf"><button class="pkx">${first?'나중에 고르기':'닫기'}</button></div></div>`;
+ box.onclick=e=>{const b=e.target.closest('.pk');if(b){lsSet('dg_store',b.dataset.g);S.group=b.dataset.g;S.tab='brief';box.remove();render();window.scrollTo(0,0);toast('🏠 내 매장: '+gname(b.dataset.g));return}
+  if(e.target.closest('.pkx')||e.target===box)box.remove()};
+ document.body.appendChild(box)}
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+function syncHome(){
+ const my=lsGet('dg_store'),hb=$('#homeBtn'),sb=$('#setHome');if(!hb)return;
+ if(my){hb.style.display='';hb.textContent='🏠 '+(my==='대경지역'?'지역 전체':my.replace(/^\S+\s/,''));hb.classList.toggle('on',S.group===my)}else hb.style.display='none';
+ sb.style.display=(S.group===my)?'none':'';sb.textContent=my?'⭐ 이 대상을 내 매장으로':'⭐ 내 매장 정하기'}
+(function(){
+ if(typeof document==='undefined')return;
+ const css=`
+ .hbar{display:flex;gap:6px;align-items:center;margin-left:auto}
+ .hbtn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:14px;padding:4px 10px;font-size:12px;cursor:pointer}
+ details.hn{width:100%;font-size:12px;opacity:.9}details.hn summary{cursor:pointer;list-style:none;display:inline-block}details.hn summary::-webkit-details-marker{display:none}
+ details.hn div{margin-top:4px;line-height:1.5}
+ .myb{border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:16px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+ .myb.on{background:var(--blue);color:#fff}
+ #picker{position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:50;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px}
+ .pkbox{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:18px}
+ .pkbox h3{margin:0 0 6px;color:var(--navy)}.pkbox p{font-size:13px;color:var(--mut);margin:0 0 12px}
+ .pk{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 10px;margin:3px;font-size:14px;cursor:pointer}
+ .pk.on{border-color:var(--blue);background:#eaf2fb;font-weight:700}.pk.all{width:calc(100% - 6px);text-align:left;font-weight:700}
+ .pkg{display:flex;gap:6px;align-items:flex-start;margin-top:6px}.pkt{min-width:30px;font-weight:700;color:var(--navy);padding-top:12px;font-size:12px}
+ .pkl{display:flex;flex-wrap:wrap}.pkf{text-align:right;margin-top:10px}.pkx{border:0;background:none;color:var(--mut);cursor:pointer;font-size:13px}
+ .loadbox{display:flex;gap:12px;align-items:center;justify-content:center;padding:48px 12px;color:var(--mut)}
+ .spin{width:26px;height:26px;border:3px solid #dbe4f3;border-top-color:var(--navy);border-radius:50%;animation:sp 0.9s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+ .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f3864;color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+ #totop{position:fixed;right:14px;bottom:18px;width:42px;height:42px;border-radius:50%;border:0;background:var(--navy);color:#fff;font-size:18px;box-shadow:0 3px 10px rgba(0,0,0,.25);display:none;z-index:40;cursor:pointer}
+ .gate-rem{display:flex;gap:6px;align-items:center;justify-content:center;font-size:12px;color:var(--mut);margin:-2px 0 10px}
+ @media(max-width:700px){
+  header{padding:10px 12px}header h1{font-size:16px}
+  .ctrl{position:static;padding:6px 10px}
+  .tabs{flex-wrap:wrap;gap:4px}.tab{padding:6px 10px;font-size:13px;border:1px solid var(--line);border-radius:14px;border-bottom-width:1px}
+  .tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  select{min-width:150px;flex:1 1 150px}
+  .lbl{min-width:28px}
+ }`;
+ document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+ const setup=()=>{
+  const hb=$('#homeBtn'),sb=$('#setHome'),lk=$('#lockBtn'),ch=$('#chgHome'),tt=$('#totop');
+  if(hb)hb.onclick=()=>{const my=lsGet('dg_store');if(my){S.group=my;render();window.scrollTo(0,0)}};
+  if(sb)sb.onclick=()=>{lsSet('dg_store',S.group);syncHome();toast('🏠 내 매장: '+gname(S.group))};
+  if(ch)ch.onclick=()=>openPicker(false);
+  if(lk)lk.onclick=()=>{if(confirmLock()){lsDel('dg_pw');location.reload()}};
+  if(tt){window.addEventListener('scroll',()=>{tt.style.display=window.scrollY>600?'block':'none'},{passive:true});tt.onclick=()=>window.scrollTo({top:0,behavior:'smooth'})}};
+ if(document.readyState!=='loading')setup();else document.addEventListener('DOMContentLoaded',setup);
+})();
+function confirmLock(){return true}
