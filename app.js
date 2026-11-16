@@ -10,6 +10,8 @@ const fEok=v=>{if(nz(v)==null)return '-';const a=Math.abs(v);if(a>=1e8)return (v
 const fP=(v,d=1)=>nz(v)==null?'-':(v*100).toFixed(d)+'%';
 const fPP=v=>nz(v)==null?'-':(v>=0?'+':'')+(v*100).toFixed(1)+'%p';
 const dv=(a,b)=>b?a/b-1:null;
+// 전년비용 금년 값: 전년 실적이 있는 매장·월만 더한 값(m_항목·행의 5번째 값·m[])이 있으면 그것을 씀
+const yc=(k,f)=>k?(k['m_'+f]!=null?k['m_'+f]:k['cy_'+f]):null;const ym=v=>v?(v[4]!=null?v[4]:v[0]):null;const nn=(a,b)=>a==null&&b==null?null:(a||0)+(b||0);
 const sg=v=>nz(v)==null?'':(v>=0?'pos':'neg');
 const fY=v=>nz(v)==null?'<span style="color:#999">-</span>':`<span class="${sg(v)}">${v>=0?'+':''}${(v*100).toFixed(1)}%</span>`;
 const fD=v=>nz(v)==null?'-':`<span class="${sg(v)}">${v>=0?'+':''}${Math.round(v).toLocaleString('ko-KR')}</span>`;
@@ -17,20 +19,22 @@ const MONTHS=()=>S.D.meta.periods.filter(p=>!p.startsWith('누계')).map(p=>pars
 const LASTM=()=>Math.max(...MONTHS());
 const plabel=p=>p.startsWith('누계')?`누계 (1~${LASTM()}월)`:p;
 const gname=g=>g==='대경지역'?'지역 전체':g;
-function addRows(a,b){return a.map((x,i)=>{const y=b[i];return [(x[0]||0)+(y[0]||0),(x[1]||0)+(y[1]||0),x[2],x[3]]})}
+function addRows(a,b){return a.map((x,i)=>{const y=b[i];return [(x[0]||0)+(y[0]||0),nn(x[1],y[1]),x[2],x[3],(ym(x)||0)+(ym(y)||0)]})}
 function pick(node,P,G){const d=node.data;if(S.basis==='매장매출')return d.off[P][G];if(S.basis==='재고통합')return d.int[P][G];return addRows(d.off[P][G],d.int[P][G])}
 const bunRows=(P,G)=>pick(S.D.bun,P,G),brdRows=(P,G)=>pick(S.D.brd,P,G);
 // 영향이 작은 항목 흐리게: 매출(또는 판매수량) 비중과 재고 비중이 모두 2% 미만
 const FADE=0.02;const small=(a,A,b,B)=>{const x=A?(a||0)/A:0,y=B?(b||0)/B:0;return x<FADE&&y<FADE};
 const fz=(a,A,b,B)=>small(a,A,b,B)?' fade':'';
+// 문장(분석 답변)에서 빼는 작은 항목: 매출·재고 비중이 모두 1% 미만
+const TXT=0.01;const tiny=(a,A,b,B)=>{const x=A?(a||0)/A:0,y=B?(b||0)/B:0;return x<TXT&&y<TXT};
 function metrics(k,i){const b=S.basis,K=BK[b];
- const hv=b==='합계'?k.cy_tot:b==='매장매출'?k.cy_off:k.cy_int,hp=b==='합계'?k.py_tot:b==='매장매출'?k.py_off:k.py_int;
+ const hv=b==='합계'?k.cy_tot:b==='매장매출'?k.cy_off:k.cy_int,hp=b==='합계'?k.py_tot:b==='매장매출'?k.py_off:k.py_int,hm=yc(k,b==='합계'?'tot':b==='매장매출'?'off':'int');
  const iv=K==='int'?null:i.cy[K],ipv=K==='int'?null:i.py[K];
- const ip=iv!=null&&i.cy.h?iv/i.cy.h:null,pip=ipv!=null&&i.py.h?ipv/i.py.h:null;
- return{hv,hp,yoy:dv(hv,hp),share:k.cy_tot?hv/k.cy_tot:null,tot:k.cy_tot,ptot:k.py_tot,yoyTot:dv(k.cy_tot,k.py_tot),off:k.cy_off,poff:k.py_off,yoyOff:dv(k.cy_off,k.py_off),intv:k.cy_int,pint:k.py_int,yoyInt:dv(k.cy_int,k.py_int),intShare:k.cy_tot?k.cy_int/k.cy_tot:null,target:k.target,ach:k.target?k.cy_tot/k.target:null,
+ const ip=iv!=null&&i.cy.h?iv/i.cy.h:null,pip=ipv!=null&&i.py.h?ipv/i.py.h:null,im=i.m||i.cy,ipm=K==='int'?null:(im.h?im[K]/im.h:null);
+ return{hv,hp,yoy:dv(hm,hp),share:k.cy_tot?hv/k.cy_tot:null,tot:k.cy_tot,ptot:k.py_tot,yoyTot:dv(yc(k,'tot'),k.py_tot),off:k.cy_off,poff:k.py_off,yoyOff:dv(yc(k,'off'),k.py_off),intv:k.cy_int,pint:k.py_int,yoyInt:dv(yc(k,'int'),k.py_int),intShare:k.cy_tot?k.cy_int/k.cy_tot:null,target:k.target,ach:k.target?k.cy_tot/k.target:null,
  prof:k.cy_tot?k.cy_prof/k.cy_tot:null,pprof:k.py_tot?k.py_prof/k.py_tot:null,disc:k.cy_norm?1-k.cy_tot/k.cy_norm:null,pdisc:k.py_norm?1-k.py_tot/k.py_norm:null,
  conv:k.cy_vis?k.cy_buy/k.cy_vis:null,pconv:k.py_vis?k.py_buy/k.py_vis:null,atv:k.cy_cnt?k.cy_tot/k.cy_cnt:null,patv:k.py_cnt?k.py_tot/k.py_cnt:null,atvOff:k.cy_buy?k.cy_off/k.cy_buy:null,patvOff:k.py_buy?k.py_off/k.py_buy:null,atvInt:(k.cy_cnt-k.cy_buy)>0?k.cy_int/(k.cy_cnt-k.cy_buy):null,patvInt:(k.py_cnt-k.py_buy)>0?k.py_int/(k.py_cnt-k.py_buy):null,
- ip,pip,ipy:dv(ip,pip),ih:i.cy.h,pih:i.py.h,id:i.cy.d,pid:i.py.d}}
+ ip,pip,ipy:dv(ipm,pip),ih:i.cy.h,pih:i.py.h,id:i.cy.d,pid:i.py.d,ihy:dv(im.h,i.py.h),idy:dv(im.d,i.py.d)}}
 const MX=(p,g)=>metrics(S.D.kpi[p][g],S.D.ins[p][g]);
 // ---------- 차트
 function scaleMax(m){const e=Math.pow(10,Math.floor(Math.log10(m||1)));const f=m/e;return (f<=1?1:f<=2?2:f<=5?5:10)*e}
@@ -68,8 +72,8 @@ function vSummary(){
  h+=card('객단가 · 합계',fN(m.atv)+'원',`전년 ${fN(m.patv)} · ${fY(dv(m.atv,m.patv))}`);
  h+=card('객단가 · 오프라인',fN(m.atvOff)+'원',`전년 ${fN(m.patvOff)} · ${fY(dv(m.atvOff,m.patvOff))}`);
  h+=card('객단가 · 온라인',fN(m.atvInt)+'원',`전년 ${fN(m.patvInt)} · ${fY(dv(m.atvInt,m.patvInt))}`);
- h+=b==='재고통합'?card('인시생산성','해당 없음','재고통합은 근무인시 연결 불가'):card('인시생산성'+(b==='매장매출'?' (매장매출)':''),fN(m.ip)+'원/h',`전년 ${fN(m.pip)} · ${fY(dv(m.ip,m.pip))}`);
- h+='</div>';
+ h+=b==='재고통합'?card('인시생산성','해당 없음','재고통합은 근무인시 연결 불가'):card('인시생산성'+(b==='매장매출'?' (매장매출)':''),fN(m.ip)+'원/h',`전년 ${fN(m.pip)} · ${fY(m.ipy)}`);
+ h+='</div>'+exBanner(G,P);
  const tr=D.trend[BK[b]][G],labels=MONTHS().map(x=>x+'월');
  h+=`<div class="panel"><h3>월별 ${b} 추이 · ${gname(G)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(labels,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}])}<div class="note">※ 전년 값이 비어 있는 달은 전년 미영업(신규·리뉴얼) 기간입니다.</div></div>`;
  if(G==='대경지역'){
@@ -95,13 +99,13 @@ function vBun(){
   if(mid){mids.push({name:mid,v,subs});subs=[];return}
   tree.push({name:dae,v,mids});mids=[];subs=[]});
  const T=tot?tot.v[0]:1,TP=tot?tot.v[1]:1,TS=tot?tot.v[2]:0;
- const row=(cls,nm,v,key,open)=>{const[c,p,sc,sp]=v;const bw=T?Math.max(0,c/T*100):0;return `<tr class="${cls}${cls==='tot'?'':fz(c,T,sc,TS)}" ${key?`data-k="${key}"`:''}><td>${key?(open?'▾ ':'▸ '):''}${nm}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td><td style="text-align:left"><span class="bar" style="width:${Math.min(100,bw*2)}px;background:${CY}"></span></td></tr>`};
+ const row=(cls,nm,v,key,open)=>{const[c,p,sc,sp]=v,cm=ym(v);const bw=T?Math.max(0,c/T*100):0;return `<tr class="${cls}${cls==='tot'?'':fz(c,T,sc,TS)}" ${key?`data-k="${key}"`:''}><td>${key?(open?'▾ ':'▸ '):''}${nm}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(cm,p))}</td><td>${p?fD(cm-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td><td style="text-align:left"><span class="bar" style="width:${Math.min(100,bw*2)}px;background:${CY}"></span></td></tr>`};
  let b='';
  tree.forEach(d=>{b+=row('l0',d.name,d.v);d.mids.forEach(m=>{if(!(m.v[0]||m.v[1]))return;const key=d.name+'|'+m.name,op=!!S.open[key];b+=row('l1',m.name,m.v,m.subs.length?key:'',op);if(op)m.subs.forEach(s=>{if(s.v[0]||s.v[1])b+=row('l2',s.name,s.v)})})});
  if(tot)b+=row('tot',bs==='합계'?'합계 (분류 가능분)':'합계',tot.v);
  const ms=D.miss[P][G];let note2='';
- if(bs!=='매장매출'&&ms&&(ms[0]||ms[1])&&tot){const xr=(cls,nm,c,p)=>`<tr class="${cls}"><td>${nm}</td><td class="cyc">${fN(c)}</td><td>-</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>-</td><td>-</td><td></td></tr>`;
-  b+=xr('l2','※ 분류 불가 재고통합 (판매상세 미포함)',ms[0],ms[1]);b+=xr('tot',bs==='합계'?'실적합계 (월 KPI 기준)':'재고통합 (월 KPI 기준)',T+ms[0],TP+ms[1]);
+ if(bs!=='매장매출'&&ms&&(ms[0]||ms[1])&&tot){const xr=(cls,nm,c,p,cm)=>{cm=cm==null?c:cm;return `<tr class="${cls}"><td>${nm}</td><td class="cyc">${fN(c)}</td><td>-</td><td class="pyc">${fN(p)}</td><td>${fY(dv(cm,p))}</td><td>${p?fD(cm-p):'-'}</td><td>-</td><td>-</td><td></td></tr>`};
+  const msm=ms[2]!=null?ms[2]:ms[0];b+=xr('l2','※ 분류 불가 재고통합 (판매상세 미포함)',ms[0],ms[1],msm);b+=xr('tot',bs==='합계'?'실적합계 (월 KPI 기준)':'재고통합 (월 KPI 기준)',T+ms[0],nn(TP,ms[1]),ym(tot.v)+msm);
   note2=` · 판매상세에 재고통합 내역이 있는 9개점만 분류 가능 — 나머지 점의 재고통합은 '분류 불가' 행으로 표시(합계는 월 KPI와 일치)`}
  return `<div class="panel"><h3>분류별 실적 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}<div class="tw"><table class="t"><thead><tr><th>분류</th><th>금년 실적</th><th>구성비</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th><th>금년 비중</th></tr></thead><tbody>${b}</tbody></table></div><div class="note">※ ${bs} 기준(${BNOTE[bs]}) · 중분류 행을 누르면 소분류가 펼쳐집니다.${note2} · 재고는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말 · 기준과 무관 · 스타일 코드로 판매 분류에 매칭, 미매칭분은 합계에만 포함)</div></div>`}
 function vBrd(){
@@ -112,17 +116,17 @@ function vBrd(){
  const ch=list.slice(0,10);
  let h=`<div class="panel"><h3>브랜드별 신발 실적 TOP10 · ${bs} 기준 · ${gname(G)} · ${plabel(P)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(ch.map(x=>x.n),[{name:'금년',color:CY,vals:ch.map(x=>x.v[0])},{name:'전년',color:PY,vals:ch.map(x=>x.v[1])}],{rot:true,h:260})}</div>`;
  h+=`<div class="panel"><h3>브랜드 상세 <span class="note">표시 수: ${[10,15,30,999].map(n=>`<a href="#" class="topn" data-n="${n}" style="${S.topN===n?'font-weight:700':''}">${n===999?'전체':'TOP'+n}</a>`).join(' · ')}</span></h3><div class="tw"><table class="t"><thead><tr><th>순위·브랜드</th><th>금년 실적</th><th>비중</th><th>전년 실적</th><th>전년비</th><th>증감</th><th>재고(금년)</th><th>재고(전년)</th></tr></thead><tbody>`+
- top.map((x,i)=>{const[c,p,sc,sp]=x.v;return `<tr class="${fz(c,T,sc,tot[2])}"><td>${i+1}. ${x.n}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(c,p))}</td><td>${p?fD(c-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td></tr>`}).join('')+
- `<tr class="tot"><td>합계(표 브랜드)</td><td>${fN(T)}</td><td>100%</td><td>${fN(TP)}</td><td>${fY(dv(T,TP))}</td><td>${TP?fD(T-TP):'-'}</td><td>${tot[2]==null?'-':fN(tot[2])}</td><td>${tot[3]==null?'-':fN(tot[3])}</td></tr></tbody></table></div><div class="note">※ 신발 카테고리 · ${bs} 기준(${BNOTE[bs]})${bs==='매장매출'?'':' · 판매상세에 재고통합 내역이 있는 9개점만 반영(나머지 13개점은 매장매출만 포함)'} · 재고(신발)는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말).</div></div>`;
+ top.map((x,i)=>{const[c,p,sc,sp]=x.v,cm=ym(x.v);return `<tr class="${fz(c,T,sc,tot[2])}"><td>${i+1}. ${x.n}</td><td class="cyc">${fN(c)}</td><td>${T?fP(c/T):'-'}</td><td class="pyc">${fN(p)}</td><td>${fY(dv(cm,p))}</td><td>${p?fD(cm-p):'-'}</td><td>${sc==null?'-':fN(sc)}</td><td>${sp==null?'-':fN(sp)}</td></tr>`}).join('')+
+ `<tr class="tot"><td>합계(표 브랜드)</td><td>${fN(T)}</td><td>100%</td><td>${fN(TP)}</td><td>${fY(dv(ym(tot),TP))}</td><td>${TP?fD(ym(tot)-TP):'-'}</td><td>${tot[2]==null?'-':fN(tot[2])}</td><td>${tot[3]==null?'-':fN(tot[3])}</td></tr></tbody></table></div><div class="note">※ 신발 카테고리 · ${bs} 기준(${BNOTE[bs]})${bs==='매장매출'?'':' · 판매상세에 재고통합 내역이 있는 9개점만 반영(나머지 13개점은 매장매출만 포함)'} · 재고(신발)는 재고현황 기말 수량(월=해당 월말, 누계=${LASTM()}월말).</div></div>`;
  return h}
 function vTz(){
  const G=S.group,D=S.D,P=S.period,t=D.tz.months[P][G],lab=D.meta.tzBands;
- const cy=t.cy,py=t.py,tc=cy.reduce((a,b)=>a+b,0),tp=py.reduce((a,b)=>a+b,0),cd=t.cday||tc,pd=t.pday||tp;
+ const cy=t.cy,py=t.py,cm=t.m||cy,tc=cy.reduce((a,b)=>a+b,0),tp=py.reduce((a,b)=>a+b,0),tm=cm.reduce((a,b)=>a+b,0),cd=t.cday||tc,pd=t.pday||tp;
  const hasPy=tp>0;let pk=0;cy.forEach((v,i)=>{if(v/(lab[i].endsWith(':30')&&!lab[i].startsWith('1')?1:1)>cy[pk])pk=i});
  const unit=l=>{const a=l.split('~');const m=t2=>+t2.slice(0,2)*60+ +t2.slice(3);return m(a[1])-m(a[0])===30?'30분':'1시간'};
  let h='';if(S.basis!=='매장매출')h+=`<div class="banner">ℹ️ 시간대별은 전자저널(매장 POS) 기준이라 <b>매장매출</b>만 제공됩니다 (선택하신 ${S.basis} 기준과 무관).</div>`;
  h+=`<div class="panel"><h3>시간대별 매출 (${plabel(P)} · 전자저널 · 09:30~22:30) · ${gname(G)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:cy},{name:'전년',color:PY,vals:py}],{rot:true,h:260})}<div class="note">09:30~12:00·20:00~22:30은 30분 단위, 12:00~20:00은 1시간 단위라 막대 길이를 그대로 비교하지 마세요. 1시간 구간 피크: <b>${(()=>{let k=-1;cy.forEach((v,i)=>{if(unit(lab[i])==='1시간'&&(k<0||v>cy[k]))k=i});return k<0?'-':lab[k]+' ('+fP(cd?cy[k]/cd:null)+')'})()}</b></div></div>`;
- h+=`<div class="panel"><div class="tw"><table class="t"><thead><tr><th>단위</th><th>시간대</th><th>금년</th><th>비중</th><th>전년</th><th>비중</th><th>증감</th><th>전년비</th></tr></thead><tbody>`+lab.map((l,i)=>`<tr><td>${unit(l)}</td><td>${l}</td><td class="cyc">${fN(cy[i])}</td><td>${cd?fP(cy[i]/cd):'-'}</td><td class="pyc">${hasPy?fN(py[i]):'-'}</td><td>${hasPy&&pd?fP(py[i]/pd):'-'}</td><td>${hasPy?fD(cy[i]-py[i]):'-'}</td><td>${hasPy?(py[i]?fY(dv(cy[i],py[i])):(cy[i]?'신규':'-')):'-'}</td></tr>`).join('')+`<tr class="tot"><td colspan="2">09:30~22:30 합계</td><td>${fN(tc)}</td><td>${cd?fP(tc/cd):'-'}</td><td>${hasPy?fN(tp):'-'}</td><td>${hasPy&&pd?fP(tp/pd):'-'}</td><td>${hasPy?fD(tc-tp):'-'}</td><td>${hasPy?fY(dv(tc,tp)):'-'}</td></tr></tbody></table></div><div class="note">※ 전자저널 정상·반품 거래, 거래번호 중복 제거. 비중은 하루 전체 매장매출 대비.</div></div>`;
+ h+=`<div class="panel"><div class="tw"><table class="t"><thead><tr><th>단위</th><th>시간대</th><th>금년</th><th>비중</th><th>전년</th><th>비중</th><th>증감</th><th>전년비</th></tr></thead><tbody>`+lab.map((l,i)=>`<tr><td>${unit(l)}</td><td>${l}</td><td class="cyc">${fN(cy[i])}</td><td>${cd?fP(cy[i]/cd):'-'}</td><td class="pyc">${hasPy?fN(py[i]):'-'}</td><td>${hasPy&&pd?fP(py[i]/pd):'-'}</td><td>${hasPy?fD(cm[i]-py[i]):'-'}</td><td>${hasPy?(py[i]?fY(dv(cm[i],py[i])):(cy[i]?'신규':'-')):'-'}</td></tr>`).join('')+`<tr class="tot"><td colspan="2">09:30~22:30 합계</td><td>${fN(tc)}</td><td>${cd?fP(tc/cd):'-'}</td><td>${hasPy?fN(tp):'-'}</td><td>${hasPy&&pd?fP(tp/pd):'-'}</td><td>${hasPy?fD(tm-tp):'-'}</td><td>${hasPy?fY(dv(tm,tp)):'-'}</td></tr></tbody></table></div><div class="note">※ 전자저널 정상·반품 거래, 거래번호 중복 제거. 비중은 하루 전체 매장매출 대비.</div></div>`;
  return h}
 function vIns(){
  const P=S.period,G=S.group,D=S.D,b=S.basis;
@@ -130,14 +134,14 @@ function vIns(){
  const m=MX(P,G),mo=MONTHS(),K=BK[b],BLn=b==='합계'?'실적합계':'매장매출';
  const ipm=(k)=>mo.map(x=>{const i=D.ins[x+'월'][G][k];return i.h?i[K]/i.h:null});
  let h='<div class="cards">';
- h+=`<div class="card big"><div class="t">인시생산성 (${BLn} ÷ 근무인시)</div><div class="v">${fN(m.ip)}원/h</div><div class="s">전년 ${fN(m.pip)} · ${fY(dv(m.ip,m.pip))}</div></div>`;
- h+=`<div class="card"><div class="t">근무인시</div><div class="v">${fN(m.ih)}h</div><div class="s">전년 ${fN(m.pih)} · ${fY(dv(m.ih,m.pih))}</div></div>`;
- h+=`<div class="card"><div class="t">근무인일</div><div class="v">${fN(m.id)}일</div><div class="s">전년 ${fN(m.pid)} · ${fY(dv(m.id,m.pid))}</div></div>`;
+ h+=`<div class="card big"><div class="t">인시생산성 (${BLn} ÷ 근무인시)</div><div class="v">${fN(m.ip)}원/h</div><div class="s">전년 ${fN(m.pip)} · ${fY(m.ipy)}</div></div>`;
+ h+=`<div class="card"><div class="t">근무인시</div><div class="v">${fN(m.ih)}h</div><div class="s">전년 ${fN(m.pih)} · ${fY(m.ihy)}</div></div>`;
+ h+=`<div class="card"><div class="t">근무인일</div><div class="v">${fN(m.id)}일</div><div class="s">전년 ${fN(m.pid)} · ${fY(m.idy)}</div></div>`;
  h+='</div>';
  h+=`<div class="panel"><h3>월별 인시생산성 추이 (${BLn}) · ${gname(G)}</h3>${legend([[CY,'금년'],[PY,'전년']])}${lineChart(mo.map(x=>x+'월'),[{name:'금년',color:CY,vals:ipm('cy')},{name:'전년',color:PY,vals:ipm('py')}],{fmt:v=>Math.round(v/1000)+'천'})}<div class="note">※ 단위 원/시간 · 전년 영업월이 아닌 달은 비어 있습니다.</div></div>`;
  const rows=D.meta.stores.map(s=>({s,...MX(P,s)}));rows.sort((a,b2)=>(b2.ip||0)-(a.ip||0));
  h+=`<div class="panel"><h3>지점별 인시생산성 · ${BLn} 기준 · ${plabel(P)}</h3><div class="tw"><table class="t"><thead><tr><th>순위·지점</th><th>금년 인시생산성</th><th>전년</th><th>전년비</th><th>근무인시(금)</th><th>근무인시(전)</th><th>${BLn}(금)</th></tr></thead><tbody>`+
-  rows.map((r,i)=>`<tr class="clk ${r.s===G?'me':''}" data-g="${r.s}"><td>${i+1}. ${r.s}</td><td class="cyc">${fN(r.ip)}</td><td class="pyc">${fN(r.pip)}</td><td>${fY(dv(r.ip,r.pip))}</td><td>${fN(r.ih)}</td><td>${fN(r.pih)}</td><td>${fN(b==='합계'?r.tot:r.off)}</td></tr>`).join('')+'</tbody></table></div><div class="note">※ 근무인시=근태현황 출근 근무시간 합(타매장 지원근무는 지원매장 기준).</div></div>';
+  rows.map((r,i)=>`<tr class="clk ${r.s===G?'me':''}" data-g="${r.s}"><td>${i+1}. ${r.s}</td><td class="cyc">${fN(r.ip)}</td><td class="pyc">${fN(r.pip)}</td><td>${fY(r.ipy)}</td><td>${fN(r.ih)}</td><td>${fN(r.pih)}</td><td>${fN(b==='합계'?r.tot:r.off)}</td></tr>`).join('')+'</tbody></table></div><div class="note">※ 근무인시=근태현황 출근 근무시간 합(타매장 지원근무는 지원매장 기준).</div></div>';
  return h}
 // ===== 고급 분석 뷰 (브리핑 · 매장 TO DO · 재고 · 분류/브랜드 상세) =====
 (function(){const css=`.chip{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;margin:2px 4px 2px 0;white-space:nowrap}
@@ -164,7 +168,7 @@ function vBrief(){
  h+=`<div class="panel"><h3>📌 핵심 현황 · ${A.month} · ${isR?'지역 전체':G}</h3><div class="cards">`+
   card('실적합계',fEok(r.tot)+'원',`전년 ${fEok(r.ptot)} · ${fY(r.yoy)}`)+card('목표 달성률',fP(r.ach),'월 목표 대비')+
   card('구매전환율',fP(r.cv),`전년 ${fP(r.pcv)} · ${fPP(r.cv-r.pcv)}`)+card('객단가(합계)',fN(r.atv)+'원',`전년 ${fN(r.patv)} · ${fY(dv(r.atv,r.patv))}`)+
-  card('할인율(에누리)',fP(r.disc),`전년 ${fP(r.pdisc)} · ${fPP(r.disc-r.pdisc)}`)+card('인시생산성',fN(r.ip)+'원/h',`전년 ${fN(r.pip)} · ${fY(dv(r.ip,r.pip))}`)+'</div></div>';
+  card('할인율(에누리)',fP(r.disc),`전년 ${fP(r.pdisc)} · ${fPP(r.disc-r.pdisc)}`)+card('인시생산성',fN(r.ip)+'원/h',`전년 ${fN(r.pip)} · ${fY(r.ipy!==undefined?r.ipy:dv(r.ip,r.pip))}`)+'</div></div>';
  h+=isR?`<div class="panel"><h3>📈 주요 변화</h3><div class="sec">지역 전체</div>${ul(B.changes)}<div class="sec">수치가 튄 매장 <span class="note">(매장을 누르면 그 매장 브리핑으로 이동)</span></div><div class="tw"><table class="t"><thead><tr><th>매장</th><th style="text-align:left">신호</th></tr></thead><tbody>`+
   B.outliers.map(o=>`<tr class="clk" data-g="${o[0]}"><td>${o[0]}</td><td style="text-align:left;white-space:normal">${o[1].map(t=>chip(t[1],t[0])).join('')}</td></tr>`).join('')+'</tbody></table></div></div>'
   :`<div class="panel"><h3>📈 주요 변화 · ${G}</h3>${B.tags.length?'<div>'+B.tags.map(t=>chip(t[1],t[0])).join('')+'</div>':''}${ul(B.changes)}<div class="note"><span class="clk todo-go" data-g="${G}" style="cursor:pointer;color:var(--navy);font-weight:700">→ 이 매장 현황판 보기</span> · <span class="clk" data-g="대경지역" style="cursor:pointer;color:var(--navy)">지역 전체 브리핑으로</span></div></div>`;
@@ -197,7 +201,7 @@ function detailPanel(key){
  const G=S.group,rows=AV().detail[G][key],nm=key==='brand'?'브랜드':'중분류';
  const sS=rows.reduce((a,r)=>a+(r[1]||0),0),sK=(AV().inv[G]||{total:[0]}).total[0]||rows.reduce((a,r)=>a+(r[4]||0),0);
  return `<div class="panel"><h3>🔎 ${nm}별 재고 과부족 · ${AV().month} · ${gname(G)}</h3><div class="tw"><table class="t"><thead><tr><th>${nm}</th><th>${AM()} 매장매출</th><th>판매수량</th><th>수량 전년비</th><th>재고</th><th>재고 전년비</th><th>재고주수</th><th>상태</th></tr></thead><tbody>`+
- rows.map(r=>`<tr class="${fz(r[1],sS,r[4],sK)}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
+ rows.map(r=>`<tr class="${fz(r[1],sS,r[4],sK)}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td>${fN(r[2])}</td><td>${r[3]?fY(dv(r[8]!=null?r[8]:r[2],r[3])):'-'}</td><td>${fN(r[4])}</td><td>${r[5]?fY(dv(r[9]!=null?r[9]:r[4],r[5])):'-'}</td><td>${r[6]==null?'-':r[6]+'주'}</td><td>${chip(r[7])}</td></tr>`).join('')+
  `</tbody></table></div><div class="note">※ 재고주수 = ${AM()} 말 재고 ÷ 그 달 마지막 4주 주평균 판매수량. 부족 = 8주 미만(판매 유지·증가), 과다 = 52주 초과 또는 재고 증가율이 판매 증가율보다 40%p 이상 높고 26주 초과.${AM()==='9월'?' 9월 판매에는 추석 수요가 포함돼 재고주수가 평소보다 짧게 나올 수 있습니다.':''}${AM()==='10월'?' 10월은 전년 추석(10/5~7)이 있던 달이라 판매·매출 전년비가 낮게 나옵니다(9·10월 합산 비교 권장).':''}</div></div>`}
 function bestPanel(){
  const G=S.group,b=AV().best[G];
@@ -206,14 +210,14 @@ function bestPanel(){
  `</tbody></table></div><div class="note">※ 품절위험 = 재고주수 2주 미만 또는 재고 0 → 즉시 보충 요청 · 재고확보 = 4주 미만.</div></div>`}
 function vInv(){
  const G=S.group,I=AV().inv[G],t=I.total,hl=I.health,ht=Object.values(hl).reduce((a,b)=>a+b,0)||1;let h=latestNote();
- h+=`<div class="cards"><div class="card big"><div class="t">${AM()} 말 재고 수량</div><div class="v">${fN(t[0])}개</div><div class="s">전년 ${fN(t[1])} · ${fY(dv(t[0],t[1]))}</div></div>
- <div class="card"><div class="t">${AM()} 판매수량</div><div class="v">${fN(t[2])}</div><div class="s">전년 ${fN(t[3])} · ${fY(dv(t[2],t[3]))}</div></div>
+ h+=`<div class="cards"><div class="card big"><div class="t">${AM()} 말 재고 수량</div><div class="v">${fN(t[0])}개</div><div class="s">전년 ${fN(t[1])} · ${fY(dv(t[5]!=null?t[5]:t[0],t[1]))}</div></div>
+ <div class="card"><div class="t">${AM()} 판매수량</div><div class="v">${fN(t[2])}</div><div class="s">전년 ${fN(t[3])} · ${fY(dv(t[6]!=null?t[6]:t[2],t[3]))}</div></div>
  <div class="card"><div class="t">재고주수</div><div class="v">${t[4]==null?'-':t[4]+'주'}</div><div class="s">재고 ÷ 최근 4주 주평균 판매</div></div></div>`;
  const col={'부족':'#d93025','적정':'#2f75b5','과다':'#e3a400','무판매':'#8a93a6'};
  h+=`<div class="panel"><h3>🩺 재고 건강도 (스타일 기준, 수량 비중)</h3><div class="hbar">${Object.entries(hl).map(([k,v])=>v?`<div style="width:${v/ht*100}%;background:${col[k]}">${v/ht>0.06?k+' '+fP(v/ht,0):''}</div>`:'').join('')}</div>
  <div>${Object.entries(hl).map(([k,v])=>chip(`${k} ${fN(v)}개 (${fP(v/ht,0)})`,chipS[k])).join('')}</div><div class="note">부족 = 재고주수 4주 미만 · 적정 = 4~52주 · 과다 = 52주 초과 · 무판매 = 최근 8주 판매 0</div></div>`;
  h+=`<div class="panel"><h3>대분류별 재고 전년 대비</h3><div class="tw"><table class="t"><thead><tr><th>대분류</th><th>재고(금년)</th><th>재고(전년)</th><th>재고 전년비</th><th>판매수량</th><th>판매 전년비</th><th>재고주수</th></tr></thead><tbody>`+
-  I.big.map(r=>`<tr class="${fz(r[3],t[2],r[1],t[0])}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td class="pyc">${fN(r[2])}</td><td>${fY(dv(r[1],r[2]))}</td><td>${fN(r[3])}</td><td>${fY(dv(r[3],r[4]))}</td><td>${r[5]==null?'-':r[5]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>';
+  I.big.map(r=>`<tr class="${fz(r[3],t[2],r[1],t[0])}"><td>${r[0]}</td><td class="cyc">${fN(r[1])}</td><td class="pyc">${fN(r[2])}</td><td>${fY(dv(r[6]!=null?r[6]:r[1],r[2]))}</td><td>${fN(r[3])}</td><td>${fY(dv(r[7]!=null?r[7]:r[3],r[4]))}</td><td>${r[5]==null?'-':r[5]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>';
  if(G==='대경지역'){h+=`<div class="panel"><h3>⚠️ 재고 과부족 점검 매장 (브랜드·분류) <span class="note">매장을 누르면 이동</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>구분</th><th>이름</th><th>상태</th><th>재고</th><th>재고 전년비</th><th>판매수량</th><th>판매 전년비</th><th>재고주수</th></tr></thead><tbody>`+
   AV().check.map(r=>{const T0=(AV().inv[r[0]]||{total:[0,0,0]}).total;return [r,small(r[6],T0[2],r[4],T0[0])]}).sort((a,b)=>a[1]-b[1]).map(([r,sm])=>`<tr class="clk${sm?' fade':''}" data-g="${r[0]}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${chip(r[3])}</td><td>${fN(r[4])}</td><td>${fY(r[5])}</td><td>${fN(r[6])}</td><td>${fY(r[7])}</td><td>${r[8]==null?'-':r[8]+'주'}</td></tr>`).join('')+'</tbody></table></div></div>'}
  h+=detailPanel('mid');return h}
@@ -419,7 +423,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   off:{l:'매장매출(오프라인)',re:/매장매출|오프라인/,f:'won',cy:k=>k.cy_off,py:k=>k.py_off},
   int:{l:'재고통합(온라인)',re:/재고통합|온라인/,f:'won',cy:k=>k.cy_int,py:k=>k.py_int},
   ach:{l:'목표 달성률',re:/달성|목표/,f:'pct',cy:k=>k.target?k.cy_tot/k.target:null,py:()=>null},
-  yoy:{l:'전년비',re:/전년비|전년대비|전년 대비|신장|성장률|증감률/,f:'pctS',cy:k=>k.py_tot?k.cy_tot/k.py_tot-1:null,py:()=>null},
+  yoy:{l:'전년비',re:/전년비|전년대비|전년 대비|신장|성장률|증감률/,f:'pctS',cy:k=>k.py_tot?yc(k,'tot')/k.py_tot-1:null,py:()=>null},
   conv:{l:'구매전환율',re:/전환/,f:'pct',cy:k=>k.cy_vis?k.cy_buy/k.cy_vis:null,py:k=>k.py_vis?k.py_buy/k.py_vis:null},
   atv:{l:'객단가(합계)',re:/객단가/,f:'num',cy:k=>k.cy_cnt?k.cy_tot/k.cy_cnt:null,py:k=>k.py_cnt?k.py_tot/k.py_cnt:null},
   disc:{l:'할인율(에누리)',re:/할인|에누리/,f:'pct',cy:k=>k.cy_norm?1-k.cy_tot/k.cy_norm:null,py:k=>k.py_norm?1-k.py_tot/k.py_norm:null},
@@ -428,6 +432,8 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   vis:{l:'입점객수',re:/입점|방문객|유동|트래픽|내점/,f:'num',cy:k=>k.cy_vis,py:k=>k.py_vis},
   buy:{l:'매장 구매객수',re:/구매객|고객수|고객 수|객수|구매고객|구매 고객/,f:'num',cy:k=>k.cy_buy,py:k=>k.py_buy}};
  const mv=(key,P,G,py)=>{const k=K(P,G),i=S.D.ins[P][G];const v=(py?MET[key].py:MET[key].cy)(k,i);return v==null||isNaN(v)||(py&&!v)?null:v};
+ // 전년 대비 비교에 쓰는 금년 값(전년 실적이 있는 매장·월만)
+ const YF={tot:'tot',off:'off',int:'int',vis:'vis',buy:'buy'};const mvc=(key,P,G)=>{const k=K(P,G);if(YF[key])return yc(k,YF[key]);if(key==='ip'){const i=S.D.ins[P][G],m=i.m||i.cy;return m.h?m.tot/m.h:null}return mv(key,P,G)};
  const fmt=(key,v)=>{const f=MET[key].f;return v==null?'-':f==='won'?fEok(v)+'원':f==='pct'?fP(v):f==='pctS'?(v>=0?'+':'')+(v*100).toFixed(1)+'%':fN(v)+(key==='ip'?'원/h':key==='atv'?'원':'')};
  const chg=(key,c,p)=>{if(c==null||p==null)return null;const f=MET[key].f;return f==='pct'?{t:fPP(c-p),v:c-p}:{t:(c/p-1>=0?'+':'')+((c/p-1)*100).toFixed(1)+'%',v:c/p-1}};
  const chgH=c=>c?`<span class="${c.v>=0?'pos':'neg'}">${c.t}</span>`:'-';
@@ -490,11 +496,11 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
    addT(a,'',['월','금년'].concat(hasPy?['전년','증감']:[]),ms.map((m,i)=>[m+'월',fmt(key,cy[i])].concat(hasPy?[fmt(key,py[i]),chgH(chg(key,cy[i],py[i]))]:[])),['','cyc','pyc','']);
   }else{const ser=gs.map((g,j)=>({name:g,color:COL[j],vals:ms.map(m=>mv(key,m+'월',g))}));
    addC(a,'금년 기준',lineChart(lab,ser,{fmt:cfmt(key)}),gs.map((g,j)=>[COL[j],g]));
-   const last=ms[ms.length-1]+'월';gs.forEach(g=>{const c=mv(key,last,g),pv=mv(key,last,g,true);a.bul.push(`<b>${g}</b> ${last} ${fmt(key,c)}${pv!=null?` (전년 대비 ${chgH(chg(key,c,pv))})`:''}`)});
+   const last=ms[ms.length-1]+'월';gs.forEach(g=>{const c=mv(key,last,g),pv=mv(key,last,g,true);a.bul.push(`<b>${g}</b> ${last} ${fmt(key,c)}${pv!=null?` (전년 대비 ${chgH(chg(key,mvc(key,last,g),pv))})`:''}`)});
    addT(a,'',['월'].concat(gs),ms.map(m=>[m+'월'].concat(gs.map(g=>fmt(key,mv(key,m+'월',g))))))}
   return a}
  function aRank(p,key){key=key||'tot';const P=Pof(p),D=S.D,asc=p.f.low;
-  let rows=D.meta.stores.map(s=>({s,c:mv(key,P,s),p:mv(key,P,s,true)})).filter(r=>r.c!=null);rows.sort((x,y)=>asc?x.c-y.c:y.c-x.c);
+  let rows=D.meta.stores.map(s=>({s,c:mv(key,P,s),cm:mvc(key,P,s),p:mv(key,P,s,true)})).filter(r=>r.c!=null);rows.sort((x,y)=>asc?x.c-y.c:y.c-x.c);
   const a=A(`${PL(P)} 매장별 ${MET[key].l} 순위${asc?' (낮은 순)':''}`);const reg=mv(key,P,'대경지역');
   const t3=rows.slice(0,3),b3=rows.slice(-3).reverse();
   a.bul.push(`${asc?'가장 낮은':'가장 높은'} 3곳: ${t3.map(r=>`<b>${r.s}</b> ${fmt(key,r.c)}`).join(' · ')}`);
@@ -504,22 +510,22 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   addC(a,'',barChart(rows.map(r=>r.s.replace(/^(\S+) (대구)?/,'$1 ').replace(/점$/,'')),[{name:MET[key].l,color:CY,vals:rows.map(r=>key==='yoy'?Math.max(0,r.c):r.c)}],{rot:true,h:280,fmt:cfmt(key)}),null);
   if(key==='yoy')a.notes.push('그래프는 0 미만(감소) 매장을 0으로 표시합니다. 정확한 값은 표를 보세요.');
   const hasPy=rows.some(r=>r.p!=null);
-  addT(a,'',['순위','매장',MET[key].l].concat(hasPy?['전년','증감']:[]),rows.map((r,i)=>[i+1,r.s,fmt(key,r.c)].concat(hasPy?[fmt(key,r.p),chgH(chg(key,r.c,r.p))]:[])),['','','cyc','pyc','']);
+  addT(a,'',['순위','매장',MET[key].l].concat(hasPy?['전년','증감']:[]),rows.map((r,i)=>[i+1,r.s,fmt(key,r.c)].concat(hasPy?[fmt(key,r.p),chgH(chg(key,r.cm,r.p))]:[])),['','','cyc','pyc','']);
   return a}
- function kpiRows(P,g){return ['tot','off','int','ach','conv','atv','disc','prof','ip','vis','buy'].map(k=>{const c=mv(k,P,g),pv=mv(k,P,g,true);return [MET[k].l,fmt(k,c),pv==null?'-':fmt(k,pv),chgH(chg(k,c,pv))]})}
+ function kpiRows(P,g){return ['tot','off','int','ach','conv','atv','disc','prof','ip','vis','buy'].map(k=>{const c=mv(k,P,g),pv=mv(k,P,g,true);return [MET[k].l,fmt(k,c),pv==null?'-':fmt(k,pv),chgH(chg(k,mvc(k,P,g),pv))]})}
  function aCompare(p,key){const P=Pof(p),gs=Gs(p).slice(0,6),keys=['tot','yoy','ach','conv','atv','disc','prof','ip','vis'];
   const a=A(`${gs.join(' vs ')} — ${PL(P)} 비교`);
   addT(a,'',['지표'].concat(gs),keys.map(k=>[MET[k].l].concat(gs.map(g=>fmt(k,mv(k,P,g))))));
   keys.slice(0,6).forEach(k=>{const v=gs.map(g=>({g,c:mv(k,P,g)})).filter(o=>o.c!=null);if(v.length>1){const hi=v.reduce((m,o)=>o.c>m.c?o:m);a.bul.push(`${MET[k].l}: <b>${hi.g}</b>가 가장 높음 (${fmt(k,hi.c)})`)}});
   const t=aTrend(p,key||'tot');a.blocks=a.blocks.concat(t.blocks.filter(b=>b.t==='chart').map(b=>Object.assign({},b,{cap:`${MET[key||'tot'].l} 월별 추이 (금년)`})));return a}
- function sumRow(node,P,G){const d=node.data;return d.off[P][G].map((x,i)=>{const y=d.int[P][G][i];return [(x[0]||0)+(y[0]||0),(x[1]||0)+(y[1]||0),x[2],x[3]]})}
+ function sumRow(node,P,G){const d=node.data;return d.off[P][G].map((x,i)=>{const y=d.int[P][G][i];return [(x[0]||0)+(y[0]||0),nn(x[1],y[1]),x[2],x[3],(ym(x)||0)+(ym(y)||0)]})}
  function aBrand(p){const D=S.D,P=Pof(p),g=Gs(p)[0],names=D.brd.brands,ms=MONTHS(),lab=ms.map(m=>m+'월');
   if(!p.brands.length){const d=sumRow(D.brd,P,g),list=names.map((n,i)=>({n,v:d[i]})).filter(x=>x.n!=='합계'&&x.v[0]).sort((x,y)=>y.v[0]-x.v[0]),T=d[names.length-1][0],top=list.slice(0,10);
    const a=A(`${gname(g)} — ${PL(P)} 브랜드별 신발 실적 TOP10`);
    a.bul.push(`1~3위: ${top.slice(0,3).map(x=>`<b>${x.n}</b> ${fEok(x.v[0])}원(비중 ${fP(x.v[0]/T)})`).join(' · ')}`);
-   const up=[...list].filter(x=>x.v[1]>0&&x.v[0]>T*0.005).sort((x,y)=>dv(y.v[0],y.v[1])-dv(x.v[0],x.v[1]));if(up.length)a.bul.push(`전년 대비 가장 많이 늘어난 브랜드 <b>${up[0].n}</b> ${fY(dv(up[0].v[0],up[0].v[1]))} · 가장 많이 줄어든 브랜드 <b>${up[up.length-1].n}</b> ${fY(dv(up[up.length-1].v[0],up[up.length-1].v[1]))}`);
+   const up=[...list].filter(x=>x.v[1]>0&&x.v[0]>T*0.01).sort((x,y)=>dv(ym(y.v),y.v[1])-dv(ym(x.v),x.v[1]));if(up.length)a.bul.push(`전년 대비 가장 많이 늘어난 브랜드 <b>${up[0].n}</b> ${fY(dv(ym(up[0].v),up[0].v[1]))} · 가장 많이 줄어든 브랜드 <b>${up[up.length-1].n}</b> ${fY(dv(ym(up[up.length-1].v),up[up.length-1].v[1]))}`);
    addC(a,'',barChart(top.map(x=>x.n),[{name:'금년',color:CY,vals:top.map(x=>x.v[0])},{name:'전년',color:PY,vals:top.map(x=>x.v[1])}],{rot:true,h:260}),[[CY,'금년'],[PY,'전년']]);
-   addT(a,'',['순위','브랜드','금년','비중','전년','전년비','재고'],top.map((x,i)=>[i+1,x.n,fN(x.v[0]),fP(x.v[0]/T),fN(x.v[1]),fY(dv(x.v[0],x.v[1])),x.v[2]==null?'-':fN(x.v[2])]),['','','cyc','','pyc','','']);
+   addT(a,'',['순위','브랜드','금년','비중','전년','전년비','재고'],top.map((x,i)=>[i+1,x.n,fN(x.v[0]),fP(x.v[0]/T),fN(x.v[1]),fY(dv(ym(x.v),x.v[1])),x.v[2]==null?'-':fN(x.v[2])]),['','','cyc','','pyc','','']);
    a.notes.push('신발 카테고리 · 매장매출+재고통합(판매상세에 재고통합 내역이 있는 9개 점만 온라인 포함).');return a}
   const bs=p.brands.slice(0,4),idx=bs.map(b=>names.indexOf(b));
   const a=A(`${gname(g)} — ${bs.join(' · ')} 신발 실적`);
@@ -527,8 +533,8 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   if(bs.length===1){const py=ms.map(m=>sumRow(D.brd,m+'월',g)[idx[0]][1]);addC(a,'월별 추이',barChart(lab,[{name:'금년',color:CY,vals:ser[0].vals},{name:'전년',color:PY,vals:py}]),[[CY,'금년'],[PY,'전년']]);
    addT(a,'월별',['월','금년','전년','전년비'],ms.map((m,i)=>[m+'월',fN(ser[0].vals[i]),fN(py[i]),fY(dv(ser[0].vals[i],py[i]))]),['','cyc','pyc',''])}
   else{addC(a,'월별 추이 (금년)',lineChart(lab,ser),bs.map((b,j)=>[COL[j],b]));addT(a,'월별 (금년)',['월'].concat(bs),ms.map((m,i)=>[m+'월'].concat(ser.map(s=>fN(s.vals[i])))))}
-  bs.forEach((b,j)=>{const d=sumRow(D.brd,P,g),v=d[idx[j]],T=d[names.length-1][0];a.bul.push(`<b>${b}</b> ${PL(P)} ${fEok(v[0])}원 · 전년비 ${fY(dv(v[0],v[1]))} · 신발 내 비중 ${fP(T?v[0]/T:null)}${v[2]!=null?` · 재고 ${fN(v[2])}개(전년 ${fN(v[3])})`:''}`)});
-  if(g==='대경지역'){const b=bs[0],rk=D.meta.stores.map(s=>{const v=sumRow(D.brd,P,s)[idx[0]];return{s,c:v[0],p:v[1]}}).filter(r=>r.c>0).sort((x,y)=>y.c-x.c);
+  bs.forEach((b,j)=>{const d=sumRow(D.brd,P,g),v=d[idx[j]],T=d[names.length-1][0];a.bul.push(`<b>${b}</b> ${PL(P)} ${fEok(v[0])}원 · 전년비 ${fY(dv(ym(v),v[1]))} · 신발 내 비중 ${fP(T?v[0]/T:null)}${v[2]!=null?` · 재고 ${fN(v[2])}개(전년 ${fN(v[3])})`:''}`)});
+  if(g==='대경지역'){const b=bs[0],rk=D.meta.stores.map(s=>{const v=sumRow(D.brd,P,s)[idx[0]];return{s,c:v[0],cm:ym(v),p:v[1]}}).filter(r=>r.c>0).sort((x,y)=>y.c-x.c);
    addT(a,`${b} 매장별 실적 · ${PL(P)}`,['순위','매장','금년','전년','전년비'],rk.map((r,i)=>[i+1,r.s,fN(r.c),fN(r.p),fY(dv(r.c,r.p))]),['','','cyc','pyc','']);
    const dn=rk.filter(r=>r.p>0).sort((x,y)=>dv(x.c,x.p)-dv(y.c,y.p));if(dn.length)a.bul.push(`${b} 전년비가 가장 낮은 매장 <b>${dn[0].s}</b> ${fY(dv(dn[0].c,dn[0].p))} · 가장 높은 매장 <b>${dn[dn.length-1].s}</b> ${fY(dv(dn[dn.length-1].c,dn[dn.length-1].p))}`)}
   const dm=ADV(advM(P));if(dm){const r=dm.detail[g].brand.find(x=>x[0]===bs[0]);if(r)a.bul.push(`${advM(P)} 말 ${bs[0]} 재고 ${fN(r[4])}개 · 재고주수 ${r[6]==null?'-':r[6]+'주'} · 판정 ${chipx(r[7],r[7]==='과다'?'warn':r[7]==='부족'?'bad':'good')}`)}
@@ -537,31 +543,31 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   const find=c=>{let i=rows.findIndex(r=>r[2]===c);if(i<0)i=rows.findIndex(r=>r[1]===c&&r[2]==null);if(i<0)i=rows.findIndex(r=>r[0]===c&&r[1]==null);return i};
   if(!p.cats.length){const d=sumRow(D.bun,P,g),mids=rows.map((r,i)=>({n:r[1],i,v:d[i]})).filter(x=>rows[x.i][1]&&rows[x.i][2]==null&&x.v[0]).sort((x,y)=>y.v[0]-x.v[0]).slice(0,10),T=d[rows.length-1][0];
    const a=A(`${gname(g)} — ${PL(P)} 중분류별 실적 TOP10`);a.bul.push(`1~3위: ${mids.slice(0,3).map(x=>`<b>${x.n}</b> ${fEok(x.v[0])}원(${fP(x.v[0]/T)})`).join(' · ')}`);
-   const mv2=mids.filter(x=>x.v[1]>0).sort((x,y)=>dv(y.v[0],y.v[1])-dv(x.v[0],x.v[1]));if(mv2.length)a.bul.push(`전년 대비 가장 늘어난 분류 <b>${mv2[0].n}</b> ${fY(dv(mv2[0].v[0],mv2[0].v[1]))} · 가장 줄어든 분류 <b>${mv2[mv2.length-1].n}</b> ${fY(dv(mv2[mv2.length-1].v[0],mv2[mv2.length-1].v[1]))}`);
+   const mv2=mids.filter(x=>x.v[1]>0&&x.v[0]>T*0.01).sort((x,y)=>dv(ym(y.v),y.v[1])-dv(ym(x.v),x.v[1]));if(mv2.length)a.bul.push(`전년 대비 가장 늘어난 분류 <b>${mv2[0].n}</b> ${fY(dv(ym(mv2[0].v),mv2[0].v[1]))} · 가장 줄어든 분류 <b>${mv2[mv2.length-1].n}</b> ${fY(dv(ym(mv2[mv2.length-1].v),mv2[mv2.length-1].v[1]))}`);
    addC(a,'',barChart(mids.map(x=>x.n),[{name:'금년',color:CY,vals:mids.map(x=>x.v[0])},{name:'전년',color:PY,vals:mids.map(x=>x.v[1])}],{rot:true,h:260}),[[CY,'금년'],[PY,'전년']]);
-   addT(a,'',['순위','중분류','금년','구성비','전년','전년비'],mids.map((x,i)=>[i+1,x.n,fN(x.v[0]),fP(x.v[0]/T),fN(x.v[1]),fY(dv(x.v[0],x.v[1]))]),['','','cyc','','pyc','']);return a}
+   addT(a,'',['순위','중분류','금년','구성비','전년','전년비'],mids.map((x,i)=>[i+1,x.n,fN(x.v[0]),fP(x.v[0]/T),fN(x.v[1]),fY(dv(ym(x.v),x.v[1]))]),['','','cyc','','pyc','']);return a}
   const cs=p.cats.slice(0,4).map(c=>({c,i:find(c)})).filter(x=>x.i>=0);const a=A(`${gname(g)} — ${cs.map(x=>x.c).join(' · ')} 분류 실적`);
   const ser=cs.map((x,j)=>({name:x.c,color:COL[j],vals:ms.map(m=>sumRow(D.bun,m+'월',g)[x.i][0])}));
   if(cs.length===1){const py=ms.map(m=>sumRow(D.bun,m+'월',g)[cs[0].i][1]);addC(a,'월별 추이',barChart(lab,[{name:'금년',color:CY,vals:ser[0].vals},{name:'전년',color:PY,vals:py}]),[[CY,'금년'],[PY,'전년']]);
    addT(a,'월별',['월','금년','전년','전년비'],ms.map((m,i)=>[m+'월',fN(ser[0].vals[i]),fN(py[i]),fY(dv(ser[0].vals[i],py[i]))]),['','cyc','pyc',''])}
   else{addC(a,'월별 추이 (금년)',lineChart(lab,ser),cs.map((x,j)=>[COL[j],x.c]));addT(a,'월별 (금년)',['월'].concat(cs.map(x=>x.c)),ms.map((m,i)=>[m+'월'].concat(ser.map(s=>fN(s.vals[i])))))}
-  cs.forEach(x=>{const d=sumRow(D.bun,P,g),v=d[x.i],T=d[rows.length-1][0];a.bul.push(`<b>${x.c}</b> ${PL(P)} ${fEok(v[0])}원 · 전년비 ${fY(dv(v[0],v[1]))} · 구성비 ${fP(T?v[0]/T:null)}${v[2]!=null?` · 재고 ${fN(v[2])}개`:''}`)});
-  if(g==='대경지역'&&cs.length){const x=cs[0],rk=D.meta.stores.map(s=>{const v=sumRow(D.bun,P,s)[x.i];return{s,c:v[0],p:v[1]}}).filter(r=>r.c>0).sort((u,w)=>w.c-u.c);
+  cs.forEach(x=>{const d=sumRow(D.bun,P,g),v=d[x.i],T=d[rows.length-1][0];a.bul.push(`<b>${x.c}</b> ${PL(P)} ${fEok(v[0])}원 · 전년비 ${fY(dv(ym(v),v[1]))} · 구성비 ${fP(T?v[0]/T:null)}${v[2]!=null?` · 재고 ${fN(v[2])}개`:''}`)});
+  if(g==='대경지역'&&cs.length){const x=cs[0],rk=D.meta.stores.map(s=>{const v=sumRow(D.bun,P,s)[x.i];return{s,c:v[0],cm:ym(v),p:v[1]}}).filter(r=>r.c>0).sort((u,w)=>w.c-u.c);
    addT(a,`${x.c} 매장별 실적 · ${PL(P)}`,['순위','매장','금년','전년','전년비'],rk.map((r,i)=>[i+1,r.s,fN(r.c),fN(r.p),fY(dv(r.c,r.p))]),['','','cyc','pyc',''])}
   a.notes.push('매장매출+재고통합 기준(재고통합은 분류 가능한 9개 점만 포함).');return a}
- function aTz(p){const D=S.D,P=Pof(p),g=Gs(p)[0],t=D.tz.months[P][g],lab=D.meta.tzBands,cy=t.cy,py=t.py,tc=cy.reduce((x,y)=>x+y,0),tp=py.reduce((x,y)=>x+y,0);
+ function aTz(p){const D=S.D,P=Pof(p),g=Gs(p)[0],t=D.tz.months[P][g],lab=D.meta.tzBands,cy=t.cy,py=t.py,cm=t.m||cy,tc=cy.reduce((x,y)=>x+y,0),tp=py.reduce((x,y)=>x+y,0);
   const a=A(`${gname(g)} — ${PL(P)} 시간대별 매장매출`);const hr=lab.map((l,i)=>({l,i,v:cy[i]})).filter(o=>{const s=o.l.split('~');return (+s[1].slice(0,2)*60+ +s[1].slice(3))-(+s[0].slice(0,2)*60+ +s[0].slice(3))===60}).sort((x,y)=>y.v-x.v);
   a.bul.push(`매출이 가장 많은 시간(1시간 단위): ${hr.slice(0,3).map(o=>`<b>${o.l}</b> ${fP(tc?o.v/tc:null)}`).join(' · ')}`);
-  if(tp){const d=lab.map((l,i)=>({l,d:dv(cy[i],py[i]),v:cy[i]})).filter(o=>o.d!=null&&o.v>tc*0.03).sort((x,y)=>y.d-x.d);if(d.length)a.bul.push(`전년 대비 가장 늘어난 시간대 <b>${d[0].l}</b> ${fY(d[0].d)} · 가장 줄어든 시간대 <b>${d[d.length-1].l}</b> ${fY(d[d.length-1].d)}`)}
+  if(tp){const d=lab.map((l,i)=>({l,d:dv(cm[i],py[i]),v:cy[i]})).filter(o=>o.d!=null&&o.v>tc*0.03).sort((x,y)=>y.d-x.d);if(d.length)a.bul.push(`전년 대비 가장 늘어난 시간대 <b>${d[0].l}</b> ${fY(d[0].d)} · 가장 줄어든 시간대 <b>${d[d.length-1].l}</b> ${fY(d[d.length-1].d)}`)}
   const ev=cy.slice(lab.findIndex(l=>l.startsWith('18:'))).reduce((x,y)=>x+y,0);a.bul.push(`18시 이후 매출 비중 ${fP(tc?ev/tc:null)} · 12시 이전 비중 ${fP(tc?cy.slice(0,5).reduce((x,y)=>x+y,0)/tc:null)}`);
   addC(a,'',barChart(lab,[{name:'금년',color:CY,vals:cy},{name:'전년',color:PY,vals:py}],{rot:true,h:260}),[[CY,'금년'],[PY,'전년']]);
-  addT(a,'',['시간대','금년','비중','전년','전년비'],lab.map((l,i)=>[l,fN(cy[i]),fP(tc?cy[i]/tc:null),tp?fN(py[i]):'-',tp&&py[i]?fY(dv(cy[i],py[i])):'-']),['','cyc','','pyc','']);
+  addT(a,'',['시간대','금년','비중','전년','전년비'],lab.map((l,i)=>[l,fN(cy[i]),fP(tc?cy[i]/tc:null),tp?fN(py[i]):'-',tp&&py[i]?fY(dv(cm[i],py[i])):'-']),['','cyc','','pyc','']);
   a.notes.push('전자저널(매장 POS) 기준 매장매출 · 09:30~12:00, 20:00~22:30은 30분 단위라 막대 길이를 1시간 구간과 그대로 비교하지 마세요.');return a}
  function aInv(p){const P=advM(Pof(p)),g=Gs(p)[0],M=ADV(P),I=M.inv[g],t=I.total,hl=I.health,ht=Object.values(hl).reduce((x,y)=>x+y,0)||1;
   const a=A(`${gname(g)} — ${P} 말 재고 분석`);
-  a.bul.push(`재고 <b>${fN(t[0])}개</b> (전년 ${fN(t[1])}개, ${fY(dv(t[0],t[1]))}) · ${P} 판매수량 ${fN(t[2])}개(${fY(dv(t[2],t[3]))}) · 재고주수 <b>${t[4]==null?'-':t[4]+'주'}</b>`);
+  a.bul.push(`재고 <b>${fN(t[0])}개</b> (전년 ${fN(t[1])}개, ${fY(dv(t[5]!=null?t[5]:t[0],t[1]))}) · ${P} 판매수량 ${fN(t[2])}개(${fY(dv(t[6]!=null?t[6]:t[2],t[3]))}) · 재고주수 <b>${t[4]==null?'-':t[4]+'주'}</b>`);
   a.bul.push(`재고 건강도: ${Object.entries(hl).map(([k,v])=>`${k} ${fP(v/ht,0)}`).join(' · ')}`);
-  const br=M.detail[g].brand,over=br.filter(r=>r[7]==='과다').sort((x,y)=>y[4]-x[4]).slice(0,5),sh=br.filter(r=>r[7]==='부족').slice(0,5);
+  const br0=M.detail[g].brand,bS=br0.reduce((x,r)=>x+(r[1]||0),0),bK=br0.reduce((x,r)=>x+(r[4]||0),0),br=br0.filter(r=>!tiny(r[1],bS,r[4],bK)),over=br.filter(r=>r[7]==='과다').sort((x,y)=>y[4]-x[4]).slice(0,5),sh=br.filter(r=>r[7]==='부족').slice(0,5);
   if(over.length)a.bul.push(`과다 브랜드: ${over.map(r=>`<b>${r[0]}</b> ${fN(r[4])}개(${r[6]}주)`).join(' · ')}`);if(sh.length)a.bul.push(`부족 브랜드: ${sh.map(r=>`<b>${r[0]}</b> ${fN(r[4])}개(${r[6]}주)`).join(' · ')}`);
   const risk=M.best[g].filter(b=>b[7]!=='안정');if(risk.length)a.bul.push(`베스트 상품 재고 주의: ${risk.map(b=>`${b[0]} ${b[2]}(${b[1]}) ${fN(b[5])}개 ${chipx(b[7],b[7]==='품절위험'?'bad':'warn')}`).join(' · ')}`);
   const ms=MONTHS().filter(m=>ADV(m+'월'));addC(a,'월말 재고 수량 추이',barChart(ms.map(m=>m+'월'),[{name:'금년',color:CY,vals:ms.map(m=>ADV(m+'월').inv[g].total[0])},{name:'전년',color:PY,vals:ms.map(m=>ADV(m+'월').inv[g].total[1])}],{fmt:v=>fN(v)}),[[CY,'금년'],[PY,'전년']]);
@@ -582,9 +588,9 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   const a=A(cls.length?`${cls.map(c=>c.name).join(' · ')} 상권 현황`:'대경지역 상권 현황 (11개 클러스터)');
   if(!cls.length){const cnt={};AR.clusters.forEach(c=>cnt[c.grade]=(cnt[c.grade]||0)+1);a.bul.push(`등급 분포: ${AR.grades.map(x=>`${x} ${cnt[x]||0}개`).join(' · ')}`);
    AR.clusters.filter(c=>c.grade==='긴급'||c.grade==='경쟁·확장').forEach(c=>a.bul.push(`${chipx(c.grade,'gr'+AR.grades.indexOf(c.grade))} <b>${c.name}</b> — ${c.head}`));
-   addT(a,'',['클러스터','등급','매장',LM()+' 전년비','핵심 내용'],AR.clusters.map(c=>{const t=cluSum(c,LM());return [c.name,chipx(c.grade,'gr'+AR.grades.indexOf(c.grade)),c.stores.length+'개',fY(dv(t.cy,t.py)),c.head]}));
+   addT(a,'',['클러스터','등급','매장',LM()+' 전년비','핵심 내용'],AR.clusters.map(c=>{const t=cluSum(c,LM());return [c.name,chipx(c.grade,'gr'+AR.grades.indexOf(c.grade)),c.stores.length+'개',fY(dv(t.ycy,t.py)),c.head]}));
   }else cls.forEach(c=>{const t=cluSum(c,LM());a.bul.push(`${chipx(c.grade,'gr'+AR.grades.indexOf(c.grade))} <b>${c.name}</b> (${c.stores.join(', ')}) — ${c.head}`);c.now.forEach(x=>a.bul.push(x));
-   a.bul.push(`${LM()} 클러스터 실적합계 ${fEok(t.cy)}원 · 전년비 ${fY(dv(t.cy,t.py))} · 달성률 ${fP(t.tg?t.cy/t.tg:null)} · 입점객 ${fY(dv(t.vis,t.pvis))}`);a.bul.push(`<b>권장 액션</b>: ${c.act.join(' / ')}`);
+   a.bul.push(`${LM()} 클러스터 실적합계 ${fEok(t.cy)}원 · 전년비 ${fY(dv(t.ycy,t.py))} · 달성률 ${fP(t.tg?t.cy/t.tg:null)} · 입점객 ${fY(dv(t.yvis,t.pvis))}`);a.bul.push(`<b>권장 액션</b>: ${c.act.join(' / ')}`);
    const ms=MONTHS();addC(a,`${c.name} 월별 실적합계`,barChart(ms.map(m=>m+'월'),[{name:'금년',color:CY,vals:ms.map(m=>cluSum(c,m+'월').cy)},{name:'전년',color:PY,vals:ms.map(m=>cluSum(c,m+'월').py)}]),[[CY,'금년'],[PY,'전년']])});
   a.notes.push(`출처: ${AR.src} · ${AR.cover}. 공개 뉴스를 조사해 정리한 참고 자료이며 '미확정' 표시는 공식 발표 전 단계입니다.`);return a}
  function aTodo(p){const P=advM(Pof(p)),M=ADV(P),gs=Gs(p).filter(g=>g!=='대경지역');
@@ -595,7 +601,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
    addT(a,`${g} 할 일 (중요한 순)`,['순서','구분','할 일','근거'],t.todo.map((x,i)=>[i+1,x[0],x[1],x[2]]));a.blocks.push({t:'list',cap:`${g} 다음 달에 확인할 숫자`,items:t.next})});return a}
  function aWhy(p){const P=advM(Pof(p)),M=ADV(P),g=Gs(p)[0];
   if(g==='대경지역'){const B=M.brief,a=A(`지역 전체 — ${P} 실적 흐름의 배경`);B.verified.forEach(x=>a.bul.push(x));a.blocks.push({t:'list',cap:'점검이 필요한 가설',items:B.hyp});
-   const dn=S.D.meta.stores.map(s=>({s,c:K(P,s).cy_tot,p:K(P,s).py_tot})).filter(r=>r.p).map(r=>Object.assign(r,{d:r.c-r.p})).sort((x,y)=>x.d-y.d);
+   const dn=S.D.meta.stores.map(s=>({s,c:yc(K(P,s),'tot'),p:K(P,s).py_tot})).filter(r=>r.p).map(r=>Object.assign(r,{d:r.c-r.p})).sort((x,y)=>x.d-y.d);
    addT(a,'전년 대비 증감액이 큰 매장',['매장','금년','전년','증감액','전년비'],dn.slice(0,5).concat(dn.slice(-3).reverse()).map(r=>[r.s,fN(r.c),fN(r.p),fD(r.d),fY(dv(r.c,r.p))]),['','cyc','pyc','','']);
    addC(a,'주간 매출 흐름 (매장매출)',barChart(B.weeks.map(w=>w[0]),[{name:'금년',color:CY,vals:B.weeks.map(w=>w[2])},{name:'전년',color:PY,vals:B.weeks.map(w=>w[3])}]),[[CY,'금년'],[PY,'전년']]);a.notes.push('함께 나타난 숫자이며 원인을 확정한 것은 아닙니다.');return a}
   const t=M.todo[g],a=A(`${g} — ${P} 실적 흐름의 배경`);a.bul.push(strip(t.ai));
@@ -663,7 +669,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
    XLSX.utils.book_append_sheet(wb,ws,('표'+n+'_'+strip(b.cap||'')).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31))});
   XLSX.writeFile(wb,fnm(o,'xlsx'))}
  // ---------- 상권
- function cluSum(c,P){const o={cy:0,py:0,tg:0,vis:0,pvis:0,buy:0,pbuy:0};c.stores.forEach(s=>{const k=K(P,s);o.cy+=k.cy_tot||0;o.py+=k.py_tot||0;o.tg+=k.target||0;o.vis+=k.cy_vis||0;o.pvis+=k.py_vis||0;o.buy+=k.cy_buy||0;o.pbuy+=k.py_buy||0});return o}
+ function cluSum(c,P){const o={cy:0,py:0,tg:0,vis:0,pvis:0,buy:0,pbuy:0,ycy:0,yvis:0};c.stores.forEach(s=>{const k=K(P,s);o.cy+=k.cy_tot||0;o.tg+=k.target||0;o.vis+=k.cy_vis||0;o.buy+=k.cy_buy||0;if(k.py_tot){o.py+=k.py_tot;o.ycy+=yc(k,'tot')||0}if(k.py_vis){o.pvis+=k.py_vis;o.yvis+=yc(k,'vis')||0}o.pbuy+=k.py_buy||0});return o}
  const GC=['#d93025','#e8833a','#2e9e55','#aab2c2'];
  function vArea(){const AR=S.D.area;if(!AR)return OLDDATA();const P=S.period,G=S.group,ms=MONTHS(),gi=c=>AR.grades.indexOf(c.grade);
   const mine=G==='대경지역'?null:CLof(G);const cnt={};AR.clusters.forEach(c=>cnt[c.grade]=(cnt[c.grade]||0)+1);
@@ -675,18 +681,18 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
    `</tbody></table></div><div class="legend" style="margin-top:6px">${AR.grades.map((g,i)=>`<span><i style="background:${GC[i]}"></i>${g}</span>`).join('')}</div>
    <div class="sec">등급이 바뀐 기록</div>${ulx(AR.changes.map(x=>`<b>${x[0].replace('-','/')}</b> ${AR.clusters.find(c=>c.id===x[1]).name}: ${x[2]} → <b>${x[3]}</b> — ${x[4]}`))}<div class="note">8/30 이후 정기 회차에서는 11개 클러스터 모두 등급이 유지되고 있습니다. 홈플러스 성서점은 8월 말부터 긴급 등급이 이어지고 있습니다.</div></div>`;
   // 상권별 실적 연결표
-  const rows=AR.clusters.map(c=>{const t=cluSum(c,P),l3=ms.slice(-3).map(m=>{const x=cluSum(c,m+'월');return dv(x.cy,x.py)});return{c,t,l3}});
+  const rows=AR.clusters.map(c=>{const t=cluSum(c,P),l3=ms.slice(-3).map(m=>{const x=cluSum(c,m+'월');return dv(x.ycy,x.py)});return{c,t,l3}});
   h+=`<div class="panel"><h3>🧭 상권별 실적 현황 · ${plabel(P)} <span class="note">(행을 누르면 아래 상세로 이동)</span></h3><div class="tw"><table class="t"><thead><tr><th>클러스터</th><th>등급</th><th>매장 수</th><th>실적합계</th><th>전년비</th><th>달성률</th><th>입점객 전년비</th><th>구매전환율</th><th>최근 3개월 전년비 흐름</th></tr></thead><tbody>`+
-   rows.map(({c,t,l3})=>`<tr class="clk agoto" data-c="${c.id}"><td>${c.name}${c.unv?' <span class="note">미확인</span>':''}</td><td>${chipx(c.grade,'gr'+gi(c))}</td><td>${c.stores.length}</td><td class="cyc">${fN(t.cy)}</td><td>${fY(dv(t.cy,t.py))}</td><td>${fP(t.tg?t.cy/t.tg:null)}</td><td>${fY(dv(t.vis,t.pvis))}</td><td>${fP(t.vis?t.buy/t.vis:null)}</td><td>${l3.map(v=>fY(v)).join(' → ')}</td></tr>`).join('')+
+   rows.map(({c,t,l3})=>`<tr class="clk agoto" data-c="${c.id}"><td>${c.name}${c.unv?' <span class="note">미확인</span>':''}</td><td>${chipx(c.grade,'gr'+gi(c))}</td><td>${c.stores.length}</td><td class="cyc">${fN(t.cy)}</td><td>${fY(dv(t.ycy,t.py))}</td><td>${fP(t.tg?t.cy/t.tg:null)}</td><td>${fY(dv(t.yvis,t.pvis))}</td><td>${fP(t.vis?t.buy/t.vis:null)}</td><td>${l3.map(v=>fY(v)).join(' → ')}</td></tr>`).join('')+
    `</tbody></table></div><div class="note">※ '미확인' = 이번 회차 검색에서 최신 기사를 확인하지 못한 클러스터(변동 없음이 아니라 확인 못 함).</div></div>`;
   // 클러스터 전년비 추이 차트
   const pick=mine?[mine]:AR.clusters.filter(c=>c.grade==='긴급'||c.grade==='경쟁·확장').concat(AR.clusters.filter(c=>c.id==='gm'||c.id==='yh'));
-  h+=`<div class="panel"><h3>📉 상권별 실적합계 전년비 추이 (월별) ${mine?'· '+mine.name:'· 주요 상권'}</h3>${legend(pick.map((c,j)=>[COL[j],c.name]))}${lineChart(ms.map(m=>m+'월'),pick.map((c,j)=>({name:c.name,color:COL[j],vals:ms.map(m=>{const x=cluSum(c,m+'월');const d=dv(x.cy,x.py);return d==null?null:Math.max(0,1+d)})})),{fmt:v=>Math.round(v*100)+'%'})}<div class="note">※ 100% = 전년과 같은 수준. 전년 영업 기록이 없는 매장(FH 대구동성로중앙점, 6월 오픈)은 금년 실적만 더해져 동성로가 높게 나옵니다.</div></div>`;
+  h+=`<div class="panel"><h3>📉 상권별 실적합계 전년비 추이 (월별) ${mine?'· '+mine.name:'· 주요 상권'}</h3>${legend(pick.map((c,j)=>[COL[j],c.name]))}${lineChart(ms.map(m=>m+'월'),pick.map((c,j)=>({name:c.name,color:COL[j],vals:ms.map(m=>{const x=cluSum(c,m+'월');const d=dv(x.ycy,x.py);return d==null?null:Math.max(0,1+d)})})),{fmt:v=>Math.round(v*100)+'%'})}<div class="note">※ 100% = 전년과 같은 수준. 전년 영업 기록이 없는 매장(FH 대구동성로중앙점, 6월 오픈)은 금년 실적만 더해져 동성로가 높게 나옵니다.</div></div>`;
   // 클러스터 카드
   const list=mine?[mine].concat(AR.clusters.filter(c=>c!==mine)):AR.clusters;
   h+=`<div class="panel"><h3>🏙️ 상권 상세 ${mine?`<span class="note">(${G}가 속한 상권을 맨 위에 표시)</span>`:''}</h3>`+list.map(c=>{const t=cluSum(c,P);
    return `<div class="clu g${gi(c)}" id="clu-${c.id}"><h4>${chipx(c.grade,'gr'+gi(c))} ${c.name}${c.unv?' <span class="note">· 최신 기사 미확인</span>':''}</h4><div class="note" style="margin:0">${c.addr} · ${c.stores.map(s=>`<span class="clk sgo" data-g="${s}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${s}</span>`).join(', ')}</div>
-   <div class="hd">${c.head}</div><div>${chipx(`${plabel(P)} 실적 ${fEok(t.cy)}원`,'mid')}${chipx(`전년비 ${strip(fY(dv(t.cy,t.py)))}`,dv(t.cy,t.py)>=0?'good':'bad')}${chipx(`달성률 ${fP(t.tg?t.cy/t.tg:null)}`,'mid')}${chipx(`입점객 ${strip(fY(dv(t.vis,t.pvis)))}`,dv(t.vis,t.pvis)>=0?'good':'bad')}</div>
+   <div class="hd">${c.head}</div><div>${chipx(`${plabel(P)} 실적 ${fEok(t.cy)}원`,'mid')}${chipx(`전년비 ${strip(fY(dv(t.ycy,t.py)))}`,dv(t.ycy,t.py)>=0?'good':'bad')}${chipx(`달성률 ${fP(t.tg?t.cy/t.tg:null)}`,'mid')}${chipx(`입점객 ${strip(fY(dv(t.yvis,t.pvis)))}`,dv(t.yvis,t.pvis)>=0?'good':'bad')}</div>
    <div class="two" style="margin-top:6px"><div><div class="sec">지금 상황</div>${ulx(c.now)}<div class="sec">경쟁사 현황</div><div style="font-size:13px">${c.comp}</div></div><div><div class="sec">권장 액션</div>${ulx(c.act)}<div class="sec">주요 사건 흐름</div><ul class="tl">${c.tl.map(x=>`<li><b>${x[0].replace('-','/')}</b><span>${x[1]}</span></li>`).join('')}</ul></div></div></div>`}).join('')+'</div>';
   // 뉴스
   const nw=AR.news.filter(n=>!mine||!n[2]||n[2]===mine.id);
@@ -834,9 +840,10 @@ function navHTML(){
 TABS.push(['home','현황판']);
 const DN=['입점객','구매전환율','객단가(매장)'];
 function drv(k){
- if(!k||!(k.py_vis&&k.cy_vis&&k.py_buy&&k.cy_buy&&k.py_off&&k.cy_off))return null;
- const r=[[k.cy_vis,k.py_vis],[k.cy_buy/k.cy_vis,k.py_buy/k.py_vis],[k.cy_off/k.cy_buy,k.py_off/k.py_buy]];
- const L=r.map(([c,p])=>Math.log(c/p)),T=Math.log(k.cy_off/k.py_off),D=k.cy_off-k.py_off;
+ if(!k)return null;const cv=yc(k,'vis'),cb=yc(k,'buy'),co=yc(k,'off');
+ if(!(k.py_vis&&cv&&k.py_buy&&cb&&k.py_off&&co))return null;
+ const r=[[cv,k.py_vis],[cb/cv,k.py_buy/k.py_vis],[co/cb,k.py_off/k.py_buy]];
+ const L=r.map(([c,p])=>Math.log(c/p)),T=Math.log(co/k.py_off),D=co-k.py_off;
  return {D,c:L.map(l=>Math.abs(T)>1e-9?D*l/T:0),g:r.map(([c,p])=>c/p-1),cur:r.map(x=>x[0]),prev:r.map(x=>x[1])}}
 const suspect=d=>d&&d.g[0]<=-0.3&&d.g[1]>=0.2;
 const dotC=a=>a==null?'#b3b3b3':a>=1?'#1a6fc4':a>=0.9?'#e3a400':'#d93025';
@@ -847,19 +854,22 @@ function peerRows(G,P){
  return L.map(c=>{let oc=0,op=0,cc=0,cp=0,n=0;ms.forEach(m=>{const i=m-1,k=S.D.kpi[m+'월']&&S.D.kpi[m+'월'][G];
    if(!k||c.cy[i]==null||c.py[i]==null||!k.cy_off||!k.py_off)return;oc+=k.cy_off;op+=k.py_off;cc+=c.cy[i];cp+=c.py[i];n++});
   const a=dv(oc,op),b=dv(cc,cp);return {n:c.n,mo:n,a,b,gap:(a!=null&&b!=null)?a-b:null,share:cc&&oc?cc/oc:null}})}
+function exList(G,P){const L=S.D.meta.yoyEx||[],mo=P.startsWith('누계')?null:parseInt(P);return L.filter(x=>(G==='대경지역'||x[0]===G)&&(mo==null||x[2].includes(mo)))}
+const exNote=(G,P)=>{const L=exList(G,P);return L.length&&G!=='대경지역'?` (전년비 제외 달: ${L.map(x=>x[1]+' '+x[2].join('·')+'월').join(', ')})`:''};
+function exBanner(G,P){const L=exList(G,P);if(!L.length)return '';return `<div class="note" style="margin:6px 2px 10px">※ ${S.D.meta.yoyRule} 제외: ${L.map(x=>`${x[0]} ${x[2].length>=10?'전체':x[2].join('·')+'월'}(${x[1]})`).join(' · ')}</div>`}
 function promoOf(G){const L=((S.D.promo||{}).list)||[];return G==='대경지역'?L:L.filter(x=>x.s.includes(G))}
 function vHome(){
  const P=S.period,G=S.group,isR=G==='대경지역',K=S.D.kpi[P],k=K[G];if(!k)return '<div class="banner">자료가 없습니다.</div>';
  const ach=k.target?k.cy_tot/k.target:null,gap=k.target?k.cy_tot-k.target:null;
  const cv=k.cy_vis?k.cy_buy/k.cy_vis:null,pcv=k.py_vis?k.py_buy/k.py_vis:null,at=k.cy_buy?k.cy_off/k.cy_buy:null,pat=k.py_buy?k.py_off/k.py_buy:null;
- const stores=S.D.meta.stores.map(s=>{const x=K[s];const d=drv(x);return {s,x,d,ach:x&&x.target?x.cy_tot/x.target:null,yoy:x?dv(x.cy_tot,x.py_tot):null,gap:x&&x.target?x.cy_tot-x.target:null}});
+ const stores=S.D.meta.stores.map(s=>{const x=K[s];const d=drv(x);return {s,x,d,ach:x&&x.target?x.cy_tot/x.target:null,yoy:x?dv(yc(x,'tot'),x.py_tot):null,gap:x&&x.target?x.cy_tot-x.target:null}});
  const rk=[...stores].filter(z=>z.ach!=null).sort((a,b)=>b.ach-a.ach);
  const card=(t,v,sub,big)=>`<div class="card${big?' big':''}"><div class="t">${t}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
- let h=`<div class="cards">`+card(`실적합계 · ${plabel(P)}`,fE(k.cy_tot),`전년 ${fE(k.py_tot)} · ${fY(dv(k.cy_tot,k.py_tot))}`,true)+
+ let h=`<div class="cards">`+card(`실적합계 · ${plabel(P)}`,fE(k.cy_tot),`전년 ${fE(k.py_tot)} · ${fY(dv(yc(k,'tot'),k.py_tot))}`,true)+
   card('목표 달성률',fP(ach),gap==null?'목표 없음':gap>=0?`목표 초과 <b class="pos">+${fE(gap)}</b>`:`목표까지 <b class="neg">${fE(-gap)}</b> 부족`)+
   card('구매전환율 (매장)',fP(cv),`전년 ${fP(pcv)} · ${cv!=null&&pcv!=null?fPP(cv-pcv):'-'}`)+
   card('객단가 (매장)',fN(at)+'원',`전년 ${fN(pat)} · ${fY(dv(at,pat))}`)+
-  (isR?'':card('지역 내 달성률 순위',(rk.findIndex(z=>z.s===G)+1||'-')+' / '+rk.length,'22개점 중'))+'</div>';
+  (isR?'':card('지역 내 달성률 순위',(rk.findIndex(z=>z.s===G)+1||'-')+' / '+rk.length,'22개점 중'))+'</div>'+exBanner(G,P);
  // 요인 분해
  const d=drv(k);
  if(d){const mx=Math.max(...d.c.map(Math.abs))||1;const neg=d.c.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]);
@@ -870,7 +880,7 @@ function vHome(){
    d.c.map((v,i)=>`<div class="drv"><span>${DN[i]}</span><div class="bw"><div class="b ${v<0?'n':'pp'}" style="width:${Math.abs(v)/mx*100}%"></div></div><b>${fES(v)}</b><em>${fY(d.g[i])}</em></div>`).join('')+
    `<div class="note">※ 매장매출 = 입점객 × 구매전환율 × 객단가(매장매출 ÷ 매장 구매객). 세 요인의 기여를 전년 대비 증감액으로 나눔(재고통합 제외).</div>`+
    (suspect(d)?`<div class="banner" style="margin-top:8px">⚠️ 입점객 ${fY(d.g[0])}·전환율 ${fY(d.g[1])}가 동시에 크게 움직였습니다. 입점 카운터 교체·기준 변경 여부를 먼저 확인해 주세요.</div>`:'')+`</div>`}
- else h+=`<div class="panel"><h3>🔍 매장매출 요인 분해</h3><div class="note">입점객 또는 전년 자료가 없어 분해할 수 없습니다${G==='FH 대구동성로중앙점'?' (2026년 6월 인수 매장)':''}.</div></div>`;
+ else h+=`<div class="panel"><h3>🔍 매장매출 요인 분해</h3><div class="note">입점객 또는 전년 자료가 없어 분해할 수 없습니다${exNote(G,P)}.</div></div>`;
  if(isR){
   const sus=stores.filter(z=>suspect(z.d));
   if(sus.length)h+=`<div class="panel"><h3>⚠️ 자료 확인 필요 <span class="note">입점객 30% 이상 감소 + 전환율 20% 이상 상승이 함께 나타남</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>입점객</th><th>구매전환율</th><th>점검</th></tr></thead><tbody>`+
@@ -878,7 +888,7 @@ function vHome(){
   const rows=[...stores].sort((a,b)=>(a.ach==null?9:a.ach)-(b.ach==null?9:b.ach));
   h+=`<div class="panel"><h3>🚦 매장 신호등 · 달성률 낮은 순 <span class="note">매장을 누르면 그 매장 현황판</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>달성률</th><th>전년비</th><th>목표 대비</th><th>가장 큰 감소 요인</th></tr></thead><tbody>`+
    rows.map(z=>{let w='-';if(z.d){const i=[0,1,2].sort((a,b)=>z.d.c[a]-z.d.c[b])[0];w=z.d.c[i]<0?`${DN[i]} ${fY(z.d.g[i])}`:'모두 증가'}
-    return `<tr class="clk" data-g="${z.s}"><td><span class="dot" style="background:${dotC(z.ach)}"></span>${z.s}${suspect(z.d)?' ⚠️':''}</td><td>${fP(z.ach)}</td><td>${z.yoy==null?'신규':fY(z.yoy)}</td><td>${z.gap==null?'-':fES(z.gap)}</td><td style="text-align:left">${w}</td></tr>`}).join('')+
+    return `<tr class="clk" data-g="${z.s}"><td><span class="dot" style="background:${dotC(z.ach)}"></span>${z.s}${suspect(z.d)?' ⚠️':''}</td><td>${fP(z.ach)}</td><td>${z.yoy==null?'<span class="note">제외</span>':fY(z.yoy)}</td><td>${z.gap==null?'-':fES(z.gap)}</td><td style="text-align:left">${w}</td></tr>`}).join('')+
    `</tbody></table></div><div class="note">● 파랑 100% 이상 · 노랑 90~100% · 빨강 90% 미만 · 달성률 = 실적합계(재고통합 포함) ÷ 목표</div></div>`;
  }else{
   const tr=S.D.trend.tot[G];if(tr){const lab=MONTHS().map(x=>x+'월');h+=`<div class="panel"><h3>월별 실적합계 흐름 · ${G}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}],{h:200})}</div>`}
