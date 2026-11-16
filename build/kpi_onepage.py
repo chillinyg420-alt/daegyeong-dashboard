@@ -322,7 +322,7 @@ def build(ws, d):
 
     # ── Block3: 월별 (가로 전개)
     m = d['monthly']
-    note = '매장매출(오프라인) 기준'
+    note = '매장매출(오프라인) 기준' + (f" · {d['_yx_note']}" if d.get('_yx_note') else '')
     sec_title(ws, r, 1, 16, '■ 월별 매장매출 · 자사 vs 동업계', note)
     hdr(ws, r + 1, 1, '구분', 2)
     for i, mn in enumerate(m['months']):
@@ -343,7 +343,8 @@ def build(ws, d):
     put(ws, rr, 15, f'=SUMIF(C{own_c}:N{own_c},"<>",C{rr}:N{rr})', fmt=F_AMT, h='right', bg=TOT, bold=True); merge(ws, rr, 15, rr, 16)
     rr += 1
     mrow('자사 전년비', [yoy(f'{CL(3+i)}{own_c}', f'{CL(3+i)}{own_p}') for i in range(12)], None, fmt=F_PCT)
-    put(ws, rr, 15, yoy(f'O{own_c}', f'O{own_p}'), fmt=F_PCT, h='right', bg=TOT, bold=True); merge(ws, rr, 15, rr, 16)
+    # 누계 전년비: 전년 실적이 있는 달의 금년만 더해 비교
+    put(ws, rr, 15, f'=IFERROR(IF(N(O{own_p})=0,"",SUMIFS(C{own_c}:N{own_c},C{own_p}:N{own_p},">0")/O{own_p}-1),"")', fmt=F_PCT, h='right', bg=TOT, bold=True); merge(ws, rr, 15, rr, 16)
     rr += 1
     shown = [c for c in m['comps'] if c['has']]
     for cp in shown:
@@ -628,7 +629,86 @@ def summary_print(ws):
     ws.print_options.horizontalCentered = True
 
 
-def main(src, dst):
+# ---------------- 전년비 제외(신규 오픈·리뉴얼) ----------------
+def load_mask(maskf):
+    if not maskf:
+        return None
+    import json
+    M = json.load(open(maskf, encoding='utf-8'))
+    dates = M.get('dates', {})
+    def why(s):
+        op, rn = dates.get(s, [None, None])
+        if op and op >= '2025-01-01': return '신규 오픈'
+        if rn and rn >= '2025-01-01': return '리뉴얼'
+        return '전년 실적 없음'
+    return M['valid'], why
+
+
+def apply_mask(d, store, MK):
+    """전년 실적이 없거나 MASTER 기준 제외 달 → 전년 값 비움"""
+    if not MK or store not in MK[0]:
+        return set()
+    valid, why = MK
+    mt = re.search(r'(\d{4})년\s*(\d+)월', str(d.get('title') or ''))
+    year = int(mt.group(1)) if mt else 2026
+    rm = int(mt.group(2)) if mt else None
+    own = d['monthly']['own']
+    bad = set()
+    for i, (cy, py) in enumerate(own):
+        key = f'{year}-{i+1:02d}'
+        if cy in (None, ''):
+            continue
+        if not isinstance(py, (int, float)) or py == 0:
+            bad.add(i + 1)              # 전년 실적 없음(빈칸·0·'리뉴얼폐점' 등 글자) → 글자는 그대로 둠
+            if not isinstance(py, str): own[i] = (cy, None)
+        elif not valid[store].get(key, True):
+            bad.add(i + 1)
+            own[i] = (cy, None)
+    if bad:
+        ms = sorted(bad)
+        d['_yx_note'] = f"전년비는 전년 실적이 있는 달만 비교(제외: {'·'.join(map(str, ms))}월, {why(store)})"
+    if rm in bad:
+        d['kpi_prev'] = [d['kpi_prev'][0]] + [None] * (len(d['kpi_prev']) - 1)
+        d['tb'] = [(a, b, None) for a, b, _ in d['tb']]
+        d['cat'] = [(a, b, c, None) for a, b, c, _ in d['cat']]
+        d['brand'] = [(a, b, c, e, None, None) for a, b, c, e, _, _ in d['brand']]
+        d['shoe_tot'] = (d['shoe_tot'][0], None)
+        d['floor'] = [(a, b, c, None) for a, b, c, _ in d['floor']]
+    return {rm} & bad and rm
+
+
+def fix_summary(ws, MK, ex):
+    """요약 시트: 제외 매장은 전년 비우고 '제외', 지역 전년비는 비교 가능 매장끼리"""
+    rows = {}
+    for r in range(1, ws.max_row + 1):
+        v = ws.cell(r, 1).value
+        if isinstance(v, str):
+            rows[v.strip()] = r
+    if '대경지역' not in rows:
+        return
+    st = [n for n in rows if n in MK[0]]
+    if not st:
+        return
+    r0 = rows['대경지역']; r1, r2 = min(rows[n] for n in st), max(rows[n] for n in st)
+    for n, why in ex.items():
+        r = rows.get(n)
+        if r:
+            ws.cell(r, 3).value = None
+            ws.cell(r, 4).value = f'제외({why})'
+    ws.cell(r0, 3).value = f'=SUM(C{r1}:C{r2})'
+    ws.cell(r0, 4).value = f'=IFERROR((B{r0}-SUMIFS(B{r1}:B{r2},C{r1}:C{r2},""))/C{r0}-1,"")'
+    if ex:
+        note = '※ 전년비는 전년 실적이 있는 매장끼리 비교(제외: ' + ', '.join(f'{n} {w}' for n, w in ex.items()) + ') · 실적합계는 전체 포함'
+        c = ws.cell(r0 - 2 if r0 > 3 else r0 + 0, 1)
+        if c.value in (None, ''):
+            c.value = note
+        else:
+            c.value = str(c.value) + '\n' + note
+            c.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
+
+
+def main(src, dst, maskf=None):
+    MK = load_mask(maskf)
     wv = openpyxl.load_workbook(src, data_only=True)
     wf = openpyxl.load_workbook(src)
     names = wf.sheetnames
@@ -640,12 +720,16 @@ def main(src, dst):
         if isinstance(v, str) and '·' in v and '관리 지표' in v:
             suffix = v.split('·', 1)[1].strip()
             break
+    ex = {}
+    summ = []
     for idx, name in enumerate(names):
         ws_old = wf[name]
         if not is_store(ws_old):
-            summary_print(ws_old)
+            summ.append(ws_old)
             continue
         d = extract(wv[name], ws_old)
+        if apply_mask(d, name, MK):
+            ex[name] = MK[1](name)
         if not d['title']:
             d['title'] = f'{name} · {suffix}' if suffix else name
             print(f'  ※ {name}: 제목 누락 → 자동 보완')
@@ -656,9 +740,14 @@ def main(src, dst):
             ws.sheet_properties.tabColor = tab
         last = build(ws, d)
         print(f"{name}: {last}행 · 배율 {d['_pct']}% · 코멘트 {d['_cs']}pt")
+    for ws in summ:
+        if MK:
+            fix_summary(ws, MK, ex)
+        summary_print(ws)
     wf.active = 0
     wf.save(dst)
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    # 사용: python3 kpi_onepage.py 원본.xlsx 출력.xlsx [yoy_mask.json]
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
