@@ -167,7 +167,7 @@ function vBrief(){
   card('할인율(에누리)',fP(r.disc),`전년 ${fP(r.pdisc)} · ${fPP(r.disc-r.pdisc)}`)+card('인시생산성',fN(r.ip)+'원/h',`전년 ${fN(r.pip)} · ${fY(dv(r.ip,r.pip))}`)+'</div></div>';
  h+=isR?`<div class="panel"><h3>📈 주요 변화</h3><div class="sec">지역 전체</div>${ul(B.changes)}<div class="sec">수치가 튄 매장 <span class="note">(매장을 누르면 그 매장 브리핑으로 이동)</span></div><div class="tw"><table class="t"><thead><tr><th>매장</th><th style="text-align:left">신호</th></tr></thead><tbody>`+
   B.outliers.map(o=>`<tr class="clk" data-g="${o[0]}"><td>${o[0]}</td><td style="text-align:left;white-space:normal">${o[1].map(t=>chip(t[1],t[0])).join('')}</td></tr>`).join('')+'</tbody></table></div></div>'
-  :`<div class="panel"><h3>📈 주요 변화 · ${G}</h3>${B.tags.length?'<div>'+B.tags.map(t=>chip(t[1],t[0])).join('')+'</div>':''}${ul(B.changes)}<div class="note"><span class="clk todo-go" data-g="${G}" style="cursor:pointer;color:var(--navy);font-weight:700">→ 이 매장 TO DO 보기</span> · <span class="clk" data-g="대경지역" style="cursor:pointer;color:var(--navy)">지역 전체 브리핑으로</span></div></div>`;
+  :`<div class="panel"><h3>📈 주요 변화 · ${G}</h3>${B.tags.length?'<div>'+B.tags.map(t=>chip(t[1],t[0])).join('')+'</div>':''}${ul(B.changes)}<div class="note"><span class="clk todo-go" data-g="${G}" style="cursor:pointer;color:var(--navy);font-weight:700">→ 이 매장 현황판 보기</span> · <span class="clk" data-g="대경지역" style="cursor:pointer;color:var(--navy)">지역 전체 브리핑으로</span></div></div>`;
  h+=`<div class="panel"><h3>🤖 월간 AI 해석</h3>${B.ai.map(p=>`<div class="ai">${p}</div>`).join('')}</div>`;
  h+=`<div class="panel"><h3>💡 자동분석 인사이트</h3>${ul(B.insights)}</div>`;
  h+=`<div class="panel"><h3>🗓️ 월간 리포트 · 주간 매출 흐름 (매장매출, 전년 같은 요일 대비)</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(B.weeks.map(w=>w[0]),[{name:'금년',color:CY,vals:B.weeks.map(w=>w[2])},{name:'전년',color:PY,vals:B.weeks.map(w=>w[3])}])}
@@ -225,7 +225,7 @@ function render(){
  $('#basis').innerHTML=BASES.map(b=>`<button class="pill bs ${b===S.basis?'on':''}" data-b="${b}">${b}</button>`).join('');
  $('#periods').innerHTML=S.D.meta.periods.map(p=>`<button class="pill ${p===S.period?'on':''} ${p.startsWith('누계')?'ytd':''}" data-p="${p}">${p.startsWith('누계')?`누계 (1~${LASTM()}월)`:p}</button>`).join('');
  $('#group').value=S.group;
- $('#tabs').innerHTML=TABS.map(([k,t])=>`<div class="tab ${k===S.tab?'on':''}" data-t="${k}">${t}</div>`).join('');
+ $('#tabs').innerHTML=navHTML();
  $('#gnote').textContent=S.group==='대경지역'?'22개 점 합산':'';
  const miss=(NEED[S.tab]||[]).filter(k=>!S.D[k]);S.waiting=miss.length>0;
  try{ $('#main').innerHTML=miss.length?LOADING(miss):VIEWS[S.tab]() }catch(e){console.error(e);$('#main').innerHTML=S.pending?LOADING([]):`<div class="banner">⚠️ 이 화면을 표시하지 못했습니다(${e.message}). 새로고침해 주세요. 계속되면 관리자에게 알려 주세요.</div>`}
@@ -239,7 +239,7 @@ function bind(){
  $('#tabs').onclick=e=>{const b=e.target.closest('[data-t]');if(b){S.tab=b.dataset.t;render()}};
  $('#main').onclick=e=>{
   const th=e.target.closest('th.sort');if(th){const k=th.dataset.k;S.sort=S.sort.k===k?{k,d:-S.sort.d}:{k,d:-1};render();return}
-  const tg=e.target.closest('.todo-go');if(tg&&tg.dataset.g){S.group=tg.dataset.g;S.tab='todo';render();window.scrollTo(0,0);return}
+  const tg=e.target.closest('.todo-go');if(tg&&tg.dataset.g){S.group=tg.dataset.g;S.tab='home';render();window.scrollTo(0,0);return}
   const tr=e.target.closest('tr.clk');if(tr&&tr.dataset.g){S.group=tr.dataset.g;if(S.tab==='summary'||S.tab==='ins'){}render();window.scrollTo(0,0);return}
   const l1=e.target.closest('tr.l1');if(l1&&l1.dataset.k){S.open[l1.dataset.k]=!S.open[l1.dataset.k];render();return}
   const tn=e.target.closest('a.topn');if(tn){e.preventDefault();S.topN=+tn.dataset.n;render()}};
@@ -249,7 +249,7 @@ async function decrypt(enc,pass){const te=new TextEncoder();const km=await crypt
  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(enc.salt),iterations:enc.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
  const buf=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(enc.iv)},key,b64(enc.data));return JSON.parse(new TextDecoder().decode(buf))}
 // ── 자료 조각 불러오기: 핵심(약 70KB)을 먼저 열고, 나머지는 뒤에서 이어 받기
-const NEED={brief:['adv'],todo:['adv'],summary:[],bun:['bun','adv'],brd:['brd','adv','prod'],inv:['adv','bun','brd'],tz:[],ins:['adv'],ai:['adv','bun','brd','prod'],area:[],best:['prod']};
+const NEED={home:[],brief:['adv'],todo:['adv'],summary:[],bun:['bun','adv'],brd:['brd','adv','prod'],inv:['adv','bun','brd'],tz:[],ins:['adv'],ai:['adv','bun','brd','prod'],area:[],best:['prod']};
 const PNAME={adv:'브리핑·TO DO·재고',bun:'분류별',brd:'브랜드별',prod:'베스트상품'};
 const LOADING=m=>`<div class="loadbox"><div class="spin"></div><div>자료를 불러오는 중입니다…<br><small>${m.map(k=>PNAME[k]||k).join(' · ')}</small></div></div>`;
 function loadLib(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
@@ -276,7 +276,7 @@ async function unlock(pass){
  S.basis=BASES.includes(h.get('b'))?h.get('b'):'합계';
  S.period=S.D.meta.periods.includes(h.get('p'))?h.get('p'):S.D.meta.periods[0];
  const my=lsGet('dg_store');S.group=S.D.meta.groups.includes(h.get('g'))?h.get('g'):(S.D.meta.groups.includes(my)?my:'대경지역');
- S.tab=TABS.some(t=>t[0]===h.get('t'))?h.get('t'):'brief';
+ S.tab=(TABS.some(t=>t[0]===h.get('t'))&&h.get('t')!=='todo')?h.get('t'):'home';
  $('#asof').textContent='자료 기준일 '+S.D.meta.asof;if($('#hnote'))$('#hnote').textContent=S.D.meta.note;
  $('#group').innerHTML=S.D.meta.groups.map(g=>`<option value="${g}">${gname(g)}</option>`).join('');
  $('#gate').style.display='none';$('#app').style.display='block';bind();render();
@@ -619,7 +619,7 @@ if(typeof window!=='undefined')window.__app={S,render,unlock,TABS,MX,BASES};
   else if(f.tz)a=aTz(p);
   else if(p.brands.length||f.brand)a=aBrand(p);
   else if(p.cats.length||f.cat)a=aCat(p);
-  else if(f.todo)a=aTodo(p);
+  else if(f.todo)a=aBrief(p);
   else if(p.stores.length>=2&&!f.rank&&!f.trend)a=aCompare(p,key);
   else if(f.rank&&(p.stores.length<2))a=aRank(p,key);
   else if(f.trend||f.week&&false)a=aTrend(p,key);
@@ -771,7 +771,7 @@ function openPicker(first){
  <button class="pk all ${my==='대경지역'?'on':''}" data-g="대경지역">🗺 지역 전체 <small>(지역장·관리자용)</small></button>
  ${Object.entries(bySign).map(([k,a])=>`<div class="pkg"><div class="pkt">${k}</div><div class="pkl">${a.map(btn).join('')}</div></div>`).join('')}
  <div class="pkf"><button class="pkx">${first?'나중에 고르기':'닫기'}</button></div></div>`;
- box.onclick=e=>{const b=e.target.closest('.pk');if(b){lsSet('dg_store',b.dataset.g);S.group=b.dataset.g;S.tab='brief';box.remove();render();window.scrollTo(0,0);toast('🏠 내 매장: '+gname(b.dataset.g));return}
+ box.onclick=e=>{const b=e.target.closest('.pk');if(b){lsSet('dg_store',b.dataset.g);S.group=b.dataset.g;S.tab='home';box.remove();render();window.scrollTo(0,0);toast('🏠 내 매장: '+gname(b.dataset.g));return}
   if(e.target.closest('.pkx')||e.target===box)box.remove()};
  document.body.appendChild(box)}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
@@ -820,3 +820,88 @@ function syncHome(){
  if(document.readyState!=='loading')setup();else document.addEventListener('DOMContentLoaded',setup);
 })();
 function confirmLock(){return true}
+
+
+// ===== 현황판 · 메뉴 4개 묶음 (2026-11) =====
+const NAV=[['home','현황판',['home','brief']],['cmp','매장 비교',['summary','tz','ins']],['prd','상품·재고',['bun','brd','best','inv']],['ext','상권·AI',['area','ai']]];
+const SUBN={home:'현황판',brief:'브리핑 상세',summary:'요약·순위',tz:'시간대별',ins:'인시생산성',bun:'분류별',brd:'브랜드별',best:'베스트상품',inv:'재고',area:'상권',ai:'AI 분석'};
+S.lastSub=S.lastSub||{};
+function navHTML(){
+ const cur=NAV.find(g=>g[2].includes(S.tab))||NAV[0];S.lastSub[cur[0]]=S.tab;
+ const top=NAV.map(([k,t,subs])=>`<div class="tab ${k===cur[0]?'on':''}" data-t="${S.lastSub[k]||subs[0]}">${t}</div>`).join('');
+ const sub=cur[2].length>1?`<div class="subnav">${cur[2].map(x=>`<span class="sn ${x===S.tab?'on':''}" data-t="${x}">${SUBN[x]}</span>`).join('')}</div>`:'';
+ return `<div class="navtop">${top}</div>${sub}`}
+TABS.push(['home','현황판']);
+const DN=['입점객','구매전환율','객단가(매장)'];
+function drv(k){
+ if(!k||!(k.py_vis&&k.cy_vis&&k.py_buy&&k.cy_buy&&k.py_off&&k.cy_off))return null;
+ const r=[[k.cy_vis,k.py_vis],[k.cy_buy/k.cy_vis,k.py_buy/k.py_vis],[k.cy_off/k.cy_buy,k.py_off/k.py_buy]];
+ const L=r.map(([c,p])=>Math.log(c/p)),T=Math.log(k.cy_off/k.py_off),D=k.cy_off-k.py_off;
+ return {D,c:L.map(l=>Math.abs(T)>1e-9?D*l/T:0),g:r.map(([c,p])=>c/p-1),cur:r.map(x=>x[0]),prev:r.map(x=>x[1])}}
+const suspect=d=>d&&d.g[0]<=-0.3&&d.g[1]>=0.2;
+const dotC=a=>a==null?'#b3b3b3':a>=1?'#1a6fc4':a>=0.9?'#e3a400':'#d93025';
+const fE=v=>v==null?'-':(Math.abs(v)>=1e8?(v/1e8).toFixed(2)+'억':Math.round(v/1e4).toLocaleString('ko-KR')+'만');
+const fES=v=>v==null?'-':`<span class="${v<0?'neg':'pos'}">${v>=0?'+':''}${fE(v)}</span>`;
+function peerRows(G,P){
+ const L=(S.D.peer||{})[G]||[];const ms=P.startsWith('누계')?MONTHS():[parseInt(P)];
+ return L.map(c=>{let oc=0,op=0,cc=0,cp=0,n=0;ms.forEach(m=>{const i=m-1,k=S.D.kpi[m+'월']&&S.D.kpi[m+'월'][G];
+   if(!k||c.cy[i]==null||c.py[i]==null||!k.cy_off||!k.py_off)return;oc+=k.cy_off;op+=k.py_off;cc+=c.cy[i];cp+=c.py[i];n++});
+  const a=dv(oc,op),b=dv(cc,cp);return {n:c.n,mo:n,a,b,gap:(a!=null&&b!=null)?a-b:null,share:cc&&oc?cc/oc:null}})}
+function promoOf(G){const L=((S.D.promo||{}).list)||[];return G==='대경지역'?L:L.filter(x=>x.s.includes(G))}
+function vHome(){
+ const P=S.period,G=S.group,isR=G==='대경지역',K=S.D.kpi[P],k=K[G];if(!k)return '<div class="banner">자료가 없습니다.</div>';
+ const ach=k.target?k.cy_tot/k.target:null,gap=k.target?k.cy_tot-k.target:null;
+ const cv=k.cy_vis?k.cy_buy/k.cy_vis:null,pcv=k.py_vis?k.py_buy/k.py_vis:null,at=k.cy_buy?k.cy_off/k.cy_buy:null,pat=k.py_buy?k.py_off/k.py_buy:null;
+ const stores=S.D.meta.stores.map(s=>{const x=K[s];const d=drv(x);return {s,x,d,ach:x&&x.target?x.cy_tot/x.target:null,yoy:x?dv(x.cy_tot,x.py_tot):null,gap:x&&x.target?x.cy_tot-x.target:null}});
+ const rk=[...stores].filter(z=>z.ach!=null).sort((a,b)=>b.ach-a.ach);
+ const card=(t,v,sub,big)=>`<div class="card${big?' big':''}"><div class="t">${t}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
+ let h=`<div class="cards">`+card(`실적합계 · ${plabel(P)}`,fE(k.cy_tot),`전년 ${fE(k.py_tot)} · ${fY(dv(k.cy_tot,k.py_tot))}`,true)+
+  card('목표 달성률',fP(ach),gap==null?'목표 없음':gap>=0?`목표 초과 <b class="pos">+${fE(gap)}</b>`:`목표까지 <b class="neg">${fE(-gap)}</b> 부족`)+
+  card('구매전환율 (매장)',fP(cv),`전년 ${fP(pcv)} · ${cv!=null&&pcv!=null?fPP(cv-pcv):'-'}`)+
+  card('객단가 (매장)',fN(at)+'원',`전년 ${fN(pat)} · ${fY(dv(at,pat))}`)+
+  (isR?'':card('지역 내 달성률 순위',(rk.findIndex(z=>z.s===G)+1||'-')+' / '+rk.length,'22개점 중'))+'</div>';
+ // 요인 분해
+ const d=drv(k);
+ if(d){const mx=Math.max(...d.c.map(Math.abs))||1;const neg=d.c.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]);
+  const worst=neg[0],best=neg[2];
+  const msg=d.D<0?`매장매출 ${fES(d.D)} 중 <b>${DN[worst[1]]}</b> 영향이 가장 큼(${fES(worst[0])})`+(best[0]>0?` · ${DN[best[1]]}는 오히려 ${fES(best[0])} 기여`:''):
+   `매장매출 ${fES(d.D)} 증가 — <b>${DN[best[1]]}</b> 기여가 가장 큼(${fES(best[0])})`+(worst[0]<0?` · ${DN[worst[1]]}는 ${fES(worst[0])}`:'');
+  h+=`<div class="panel"><h3>🔍 왜 늘었나·줄었나 · 매장매출 요인 분해 · ${gname(G)} · ${plabel(P)}</h3><div class="ai">${msg}</div>`+
+   d.c.map((v,i)=>`<div class="drv"><span>${DN[i]}</span><div class="bw"><div class="b ${v<0?'n':'pp'}" style="width:${Math.abs(v)/mx*100}%"></div></div><b>${fES(v)}</b><em>${fY(d.g[i])}</em></div>`).join('')+
+   `<div class="note">※ 매장매출 = 입점객 × 구매전환율 × 객단가(매장매출 ÷ 매장 구매객). 세 요인의 기여를 전년 대비 증감액으로 나눔(재고통합 제외).</div>`+
+   (suspect(d)?`<div class="banner" style="margin-top:8px">⚠️ 입점객 ${fY(d.g[0])}·전환율 ${fY(d.g[1])}가 동시에 크게 움직였습니다. 입점 카운터 교체·기준 변경 여부를 먼저 확인해 주세요.</div>`:'')+`</div>`}
+ else h+=`<div class="panel"><h3>🔍 매장매출 요인 분해</h3><div class="note">입점객 또는 전년 자료가 없어 분해할 수 없습니다${G==='FH 대구동성로중앙점'?' (2026년 6월 인수 매장)':''}.</div></div>`;
+ if(isR){
+  const sus=stores.filter(z=>suspect(z.d));
+  if(sus.length)h+=`<div class="panel"><h3>⚠️ 자료 확인 필요 <span class="note">입점객 30% 이상 감소 + 전환율 20% 이상 상승이 함께 나타남</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>입점객</th><th>구매전환율</th><th>점검</th></tr></thead><tbody>`+
+   sus.map(z=>`<tr class="clk" data-g="${z.s}"><td>${z.s}</td><td>${fY(z.d.g[0])}</td><td>${fY(z.d.g[1])}</td><td style="text-align:left">입점 카운터 교체·위치·집계 기준 확인</td></tr>`).join('')+'</tbody></table></div></div>';
+  const rows=[...stores].sort((a,b)=>(a.ach==null?9:a.ach)-(b.ach==null?9:b.ach));
+  h+=`<div class="panel"><h3>🚦 매장 신호등 · 달성률 낮은 순 <span class="note">매장을 누르면 그 매장 현황판</span></h3><div class="tw"><table class="t"><thead><tr><th>매장</th><th>달성률</th><th>전년비</th><th>목표 대비</th><th>가장 큰 감소 요인</th></tr></thead><tbody>`+
+   rows.map(z=>{let w='-';if(z.d){const i=[0,1,2].sort((a,b)=>z.d.c[a]-z.d.c[b])[0];w=z.d.c[i]<0?`${DN[i]} ${fY(z.d.g[i])}`:'모두 증가'}
+    return `<tr class="clk" data-g="${z.s}"><td><span class="dot" style="background:${dotC(z.ach)}"></span>${z.s}${suspect(z.d)?' ⚠️':''}</td><td>${fP(z.ach)}</td><td>${z.yoy==null?'신규':fY(z.yoy)}</td><td>${z.gap==null?'-':fES(z.gap)}</td><td style="text-align:left">${w}</td></tr>`}).join('')+
+   `</tbody></table></div><div class="note">● 파랑 100% 이상 · 노랑 90~100% · 빨강 90% 미만 · 달성률 = 실적합계(재고통합 포함) ÷ 목표</div></div>`;
+ }else{
+  const tr=S.D.trend.tot[G];if(tr){const lab=MONTHS().map(x=>x+'월');h+=`<div class="panel"><h3>월별 실적합계 흐름 · ${G}</h3>${legend([[CY,'금년'],[PY,'전년']])}${barChart(lab,[{name:'금년',color:CY,vals:tr.cy},{name:'전년',color:PY,vals:tr.py}],{h:200})}</div>`}
+ }
+ // 동업계
+ const pg=isR?Object.keys(S.D.peer||{}):[G];const pr=[];pg.forEach(g=>peerRows(g,P).forEach(r=>pr.push([g,r])));
+ if(pr.length)h+=`<div class="panel"><h3>🏪 동업계 대비 · 매장매출 전년비 · ${plabel(P)}</h3><div class="tw"><table class="t"><thead><tr>${isR?'<th>매장</th>':''}<th>동업계</th><th>자사 전년비</th><th>동업계 전년비</th><th>차이</th><th>동업계 규모(자사=100)</th></tr></thead><tbody>`+
+  pr.map(([g,r])=>`<tr${isR?` class="clk" data-g="${g}"`:''}>${isR?`<td>${g}</td>`:''}<td>${r.n}</td><td>${fY(r.a)}</td><td>${fY(r.b)}</td><td>${r.gap==null?'-':`<span class="${r.gap<0?'neg':'pos'}">${r.gap>=0?'+':''}${(r.gap*100).toFixed(1)}%p</span>`}</td><td>${r.share==null?'-':Math.round(r.share*100)}</td></tr>`).join('')+
+  `</tbody></table></div><div class="note">※ 동업계 매출 자료가 있는 매장·월만 비교(같은 달끼리). 차이가 +면 자사가 동업계보다 잘한 것.</div></div>`;
+ const pm=promoOf(G);
+ if(pm.length)h+=`<div class="panel"><h3>🎯 운영 중·최근 행사</h3>${ul(pm.map(x=>`${isR?`<b>${x.s.join(' · ')}</b> — `:''}${x.from}${x.to?'~'+x.to:'~ 진행 중'} · ${x.t}`))}<div class="note">※ 지역장 입력 기준(${(S.D.promo||{}).asof||''}). 행사 효과는 행사가 없는 비슷한 매장과 같은 기간 전년비로 비교하세요.</div></div>`;
+ if(!isR)h+=`<div class="note" style="margin:4px 2px 12px"><span class="clk sn-go" data-t="brief" style="cursor:pointer;color:var(--navy);font-weight:700">→ 이 매장 브리핑 상세 보기</span></div>`;
+ return h}
+VIEWS.home=vHome;
+(function(){
+ if(typeof document==='undefined')return;
+ document.head.insertAdjacentHTML('beforeend',`<style>
+ .tabs{flex-direction:column;align-items:stretch}.navtop{display:flex;gap:2px;overflow-x:auto}.subnav{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+ .sn{border:1px solid var(--line);border-radius:14px;padding:4px 11px;font-size:12.5px;cursor:pointer;background:#fff;color:var(--txt)}.sn.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+ .drv{display:grid;grid-template-columns:96px 1fr 84px 64px;align-items:center;gap:8px;font-size:13px;margin:6px 0}.bw{background:#eef1f6;height:12px;border-radius:6px}
+ .drv .b{height:12px;border-radius:6px}.drv .b.n{background:#d93025}.drv .b.pp{background:#2f75b5}.drv em{font-style:normal;font-size:12px}
+ .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+ @media(max-width:700px){.cards{grid-template-columns:1fr 1fr;gap:8px}.card.big{grid-column:span 2}.card{padding:9px 11px}.card .v{font-size:19px}.card.big .v{font-size:24px}.navtop .tab{flex:1;text-align:center;padding:8px 4px}.drv{grid-template-columns:78px 1fr 70px 54px;font-size:12px}}
+ </style>`);
+ document.addEventListener('click',e=>{const t=e.target.closest('.sn-go');if(t){S.tab=t.dataset.t;render();window.scrollTo(0,0)}},true);
+})();
