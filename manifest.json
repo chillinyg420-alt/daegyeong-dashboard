@@ -1,27 +1,27 @@
 {
  "v": 2,
  "iter": 200000,
- "salt": "aTdcnm3U14dCIS/unaF/AQ==",
+ "salt": "oxkunR4S3c9K3M1Jv5n4wQ==",
  "asof": "2026-11-01",
  "parts": {
   "core": {
-   "f": "d/core.1ee118430e.bin",
+   "f": "d/core.ea16cb95cc.bin",
    "kb": 72
   },
   "adv": {
-   "f": "d/adv.fc38404933.bin",
+   "f": "d/adv.601b1fa725.bin",
    "kb": 394
   },
   "bun": {
-   "f": "d/bun.cad1684207.bin",
+   "f": "d/bun.70505c2a90.bin",
    "kb": 304
   },
   "brd": {
-   "f": "d/brd.39d55d8a92.bin",
+   "f": "d/brd.03b19d30d5.bin",
    "kb": 112
   },
   "prod": {
-   "f": "d/prod.b3a0f2d514.bin",
+   "f": "d/prod.18d6d2fe7f.bin",
    "kb": 559
   }
  }
